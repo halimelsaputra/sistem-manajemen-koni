@@ -1,122 +1,192 @@
 'use client';
 
-import React, { useState } from 'react';
-import { 
-  Trophy, 
-  Plus, 
-  Trash2, 
-  Save, 
-  Search, 
-  Filter, 
-  ChevronRight, 
-  Eye, 
-  X, 
-  CheckCircle2, 
-  Code2 
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  Trophy,
+  Plus,
+  Save,
+  Search,
+  X,
+  CheckCircle2,
+  UserPlus
 } from 'lucide-react';
-import { MOCK_PRESTASI, AtletPrestasi, MOCK_REGIONS, MOCK_CABOR_OPTIONS } from '@/data/mockData';
+import { MOCK_REGIONS } from '@/data/mockData';
 import { Card } from '@/components/ui/card';
 import { FormSelect } from '@/components/ui/form-select';
 
-interface DynamicParam {
-  id: string;
-  key: string;
-  value: string;
+interface Cabor {
+  id: number;
+  nama_cabor: string;
+}
+
+interface Atlet {
+  id: number;
+  nama_atlet: string;
+  kabupaten_kota: string;
+  cabor_id: number;
+}
+
+interface Prestasi {
+  id: number;
+  atlet_id: number;
+  event_kejuaraan: string;
+  tahun: number;
+  tingkat_lomba: string;
+  mendali: string;
+  atlet?: Atlet;
 }
 
 export default function AthletesPage() {
-  const [prestasiList, setPrestasiList] = useState<AtletPrestasi[]>(MOCK_PRESTASI);
-  
-  // Form state
-  const [namaAtlet, setNamaAtlet] = useState('');
-  const [daerah, setDaerah] = useState('Banda Aceh');
-  const [cabor, setCabor] = useState('Tarung Derajat');
-  const [event, setEvent] = useState('');
-  const [tahun, setTahun] = useState('2024');
-  const [tingkat, setTingkat] = useState('Provinsi');
-  const [medali, setMedali] = useState<'Emas' | 'Perak' | 'Perunggu' | 'Tanpa Medali'>('Emas');
-  const [dynamicParams, setDynamicParams] = useState<DynamicParam[]>([
-    { id: '1', key: 'Jumlah Gol / Poin', value: '5' }
-  ]);
+  const [prestasiList, setPrestasiList] = useState<Prestasi[]>([]);
+  const [atletList, setAtletList] = useState<Atlet[]>([]);
+  const [caborList, setCaborList] = useState<Cabor[]>([]);
 
   // Filter state
   const [filterCabor, setFilterCabor] = useState('Semua Cabor');
   const [filterDaerah, setFilterDaerah] = useState('Semua Daerah');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modal / Detail state
-  const [selectedPrestasi, setSelectedPrestasi] = useState<AtletPrestasi | null>(null);
+  // Form Prestasi state
+  const [selectedAtletName, setSelectedAtletName] = useState('');
+  const [event, setEvent] = useState('');
+  const [tahun, setTahun] = useState('2024');
+  const [tingkat, setTingkat] = useState('Provinsi');
+  const [medali, setMedali] = useState('Emas');
+
+  // Form Atlet state
+  const [newAtletNama, setNewAtletNama] = useState('');
+  const [newAtletDaerah, setNewAtletDaerah] = useState('Banda Aceh');
+  const [newAtletCabor, setNewAtletCabor] = useState('');
+
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [showInputModal, setShowInputModal] = useState(false);
+  const [showAtletModal, setShowAtletModal] = useState(false);
 
-  const handleAddDynamicParam = () => {
-    setDynamicParams(prev => [
-      ...prev,
-      { id: Date.now().toString(), key: '', value: '' }
-    ]);
-  };
+  const [mounted, setMounted] = useState(false);
 
-  const handleRemoveDynamicParam = (id: string) => {
-    setDynamicParams(prev => prev.filter(p => p.id !== id));
-  };
+  const fetchCabor = () => fetch('/api/cabor').then(res => res.json()).then(data => {
+    const arr = Array.isArray(data) ? data : data.data || [];
+    setCaborList(arr);
+    if (arr.length > 0) setNewAtletCabor(arr[0].nama_cabor);
+  }).catch(console.error);
 
-  const handleParamChange = (id: string, field: 'key' | 'value', val: string) => {
-    setDynamicParams(prev => prev.map(p => p.id === id ? { ...p, [field]: val } : p));
-  };
+  const fetchAtlet = () => fetch('/api/atlet').then(res => res.json()).then(data => {
+    const arr = Array.isArray(data) ? data : data.data || [];
+    setAtletList(arr);
+    if (arr.length > 0) setSelectedAtletName(arr[0].nama_atlet);
+  }).catch(console.error);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const fetchPrestasi = () => fetch('/api/prestasi').then(res => res.json()).then(data => {
+    const arr = Array.isArray(data) ? data : data.data || [];
+    setPrestasiList(arr);
+  }).catch(console.error);
+
+  useEffect(() => {
+    setMounted(true);
+    fetchCabor();
+    fetchAtlet();
+    fetchPrestasi();
+  }, []);
+
+  const handleAddPrestasi = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!namaAtlet || !event) {
-      alert('Mohon isi nama atlet dan nama event kejuaraan.');
-      return;
-    }
+    const atlet = atletList.find(a => a.nama_atlet === selectedAtletName);
+    if (!atlet) return alert('Silakan pilih atlet.');
+    if (!event) return alert('Nama event harus diisi.');
 
-    const metadataObj: Record<string, any> = {};
-    dynamicParams.forEach(p => {
-      if (p.key.trim()) {
-        metadataObj[p.key.trim()] = p.value;
-      }
-    });
-
-    const newItem: AtletPrestasi = {
-      id: Date.now(),
-      nama_atlet: namaAtlet,
-      kabupaten_kota: daerah,
-      cabor: cabor,
-      event: event,
+    const payload = {
+      atlet_id: atlet.id,
+      event_kejuaraan: event,
       tahun: parseInt(tahun) || 2024,
-      tingkat: tingkat,
-      medali: medali,
-      metadata_dinamis: metadataObj
+      tingkat_lomba: tingkat,
+      mendali: medali
     };
 
-    setPrestasiList([newItem, ...prestasiList]);
-    setNamaAtlet('');
-    setEvent('');
-    setDynamicParams([{ id: '1', key: '', value: '' }]);
-    setShowSuccessAlert(true);
-    setTimeout(() => setShowSuccessAlert(false), 4000);
+    try {
+      const res = await fetch('/api/prestasi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setEvent('');
+        setShowInputModal(false);
+        setShowSuccessAlert(true);
+        setTimeout(() => setShowSuccessAlert(false), 4000);
+        fetchPrestasi();
+      } else {
+        alert('Gagal menyimpan prestasi');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan');
+    }
+  };
+
+  const handleAddAtlet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAtletNama) return alert('Nama atlet harus diisi.');
+    const selCabor = caborList.find(c => c.nama_cabor === newAtletCabor);
+    if (!selCabor) return alert('Cabang olahraga invalid.');
+
+    const payload = {
+      nama_atlet: newAtletNama,
+      kabupaten_kota: newAtletDaerah,
+      cabor_id: selCabor.id
+    };
+
+    try {
+      const res = await fetch('/api/atlet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setShowAtletModal(false);
+        setNewAtletNama('');
+        await fetchAtlet();
+        setSelectedAtletName(newAtletNama);
+      } else {
+        alert('Gagal menambah atlet');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan');
+    }
+  };
+
+  const getAtletDetails = (atlet_id: number, atlet?: Atlet) => {
+    if (atlet) {
+       const caborName = caborList.find(c => c.id === atlet.cabor_id)?.nama_cabor || 'Unknown';
+       return { nama: atlet.nama_atlet, daerah: atlet.kabupaten_kota, caborName };
+    }
+    const a = atletList.find(a => a.id === atlet_id);
+    if (!a) return { nama: 'Unknown', daerah: 'Unknown', caborName: 'Unknown' };
+    const caborName = caborList.find(c => c.id === a.cabor_id)?.nama_cabor || 'Unknown';
+    return { nama: a.nama_atlet, daerah: a.kabupaten_kota, caborName };
   };
 
   const filteredList = prestasiList.filter(item => {
-    const matchSearch = item.nama_atlet.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                        item.event.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchCabor = filterCabor === 'Semua Cabor' || item.cabor === filterCabor;
-    const matchDaerah = filterDaerah === 'Semua Daerah' || item.kabupaten_kota === filterDaerah;
+    const details = getAtletDetails(item.atlet_id, item.atlet);
+
+    const matchSearch = details.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.event_kejuaraan.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchCabor = filterCabor === 'Semua Cabor' || details.caborName === filterCabor;
+    const matchDaerah = filterDaerah === 'Semua Daerah' || details.daerah === filterDaerah;
     return matchSearch && matchCabor && matchDaerah;
   });
+
+  const caborOptions = caborList.map(c => c.nama_cabor);
+  const atletOptions = atletList.map(a => a.nama_atlet);
 
   return (
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-[#b91c1c] mb-1">
-          <span>Executive Portal</span>
-          <span>•</span>
-          <span>Prestasi & Skor Dinamis</span>
-        </div>
-        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Direktori Prestasi & Rekap Skor Dinamis</h1>
+        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Direktori Prestasi Atlet</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Manajemen pencapaian atlet regional secara terstruktur dan terukur menggunakan PostgreSQL JSONB.
+          Manajemen pencapaian atlet regional secara terstruktur dan terukur.
         </p>
       </div>
 
@@ -124,7 +194,7 @@ export default function AthletesPage() {
         <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-xl flex items-center justify-between shadow-sm animate-fade-in">
           <div className="flex items-center space-x-3">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span className="text-sm font-semibold">Prestasi baru dan parameter skor dinamis (JSONB) berhasil disimpan!</span>
+            <span className="text-sm font-semibold">Prestasi berhasil disimpan!</span>
           </div>
           <button onClick={() => setShowSuccessAlert(false)} className="text-emerald-600 hover:text-emerald-900">
             <X className="w-4 h-4" />
@@ -132,216 +202,83 @@ export default function AthletesPage() {
         </div>
       )}
 
-      {/* Form Section: Input Prestasi Baru (Matching Screenshot 114015.png) */}
-      <Card className="rounded-2xl overflow-hidden py-0">
-        <div className="px-6 py-4 border-b border-gray-100 bg-slate-50/50">
-          <h2 className="text-lg font-bold text-gray-900">Input Prestasi Atlet Baru</h2>
-        </div>
+      {/* Table Section */}
+      <Card className="rounded-2xl overflow-hidden py-0 flex flex-col min-h-[780px]">
+        <div className="px-6 py-4 border-b border-gray-100 space-y-3 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <h2 className="text-lg font-bold text-gray-900">Database Prestasi Regional</h2>
+              <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
+                {filteredList.length} rekor
+              </span>
+            </div>
+            <button
+              onClick={() => setShowInputModal(true)}
+              className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Prestasi</span>
+            </button>
+          </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Main Grid Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div>
+          <div className="flex flex-nowrap items-end gap-2">
+            <div className="relative shrink-0">
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                Nama Atlet <span className="text-red-500">*</span>
+                Cari
               </label>
-              <input
-                type="text"
-                placeholder="Masukkan nama lengkap"
-                value={namaAtlet}
-                onChange={(e) => setNamaAtlet(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
-              />
-            </div>
-
-            <div>
-              <FormSelect
-                label="Asal Daerah/Kabupaten"
-                value={daerah}
-                options={MOCK_REGIONS.map(r => r.kabupaten_kota)}
-                onSelect={setDaerah}
-              />
-            </div>
-
-            <div>
-              <FormSelect
-                label="Cabang Olahraga"
-                value={cabor}
-                options={MOCK_CABOR_OPTIONS}
-                onSelect={setCabor}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                Nama Event <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: PORA 2022"
-                value={event}
-                onChange={(e) => setEvent(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Tahun</label>
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="number"
-                  placeholder="YYYY"
-                  value={tahun}
-                  onChange={(e) => setTahun(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  type="text"
+                  placeholder="Cari atlet atau event..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
                 />
               </div>
-              <div>
-                <FormSelect
-                label="Tingkat"
-                value={tingkat}
-                options={['Provinsi', 'Nasional', 'Internasional']}
-                onSelect={setTingkat}
-              />
-              </div>
             </div>
 
-            <div>
+            <div className="shrink-0">
               <FormSelect
-                label="Jenis Medali"
-                value={medali}
-                options={['Emas', 'Perak', 'Perunggu', 'Tanpa Medali']}
-                onSelect={(val) => setMedali(val as any)}
-              />
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100 pt-6">
-            <div className="mb-4">
-              <h3 className="text-sm font-bold text-gray-900">Parameter Skor Tambahan (Dinamis JSONB)</h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Tambahkan metrik unik sesuai Cabor (misal: Jumlah Gol pada Sepak Bola, Catatan Waktu pada Atletik, atau Ronde Menang pada Tarung Derajat) tanpa merubah skema tabel database.
-              </p>
-            </div>
-
-            {/* Dynamic Rows */}
-            <div className="space-y-3">
-              {dynamicParams.map((p) => (
-                <div key={p.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                  <div className="sm:col-span-5">
-                    <input
-                      type="text"
-                      placeholder="Nama Metrik (Contoh: Jumlah Gol)"
-                      value={p.key}
-                      onChange={(e) => handleParamChange(p.id, 'key', e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c]"
-                    />
-                  </div>
-                  <div className="sm:col-span-6">
-                    <input
-                      type="text"
-                      placeholder="Nilai (Contoh: 5 atau 10.45 detik)"
-                      value={p.value}
-                      onChange={(e) => handleParamChange(p.id, 'value', e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c]"
-                    />
-                  </div>
-                  <div className="sm:col-span-1 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveDynamicParam(p.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                      title="Hapus Parameter"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={handleAddDynamicParam}
-                className="flex items-center space-x-1.5 text-xs font-bold text-[#b91c1c] hover:text-red-800 transition"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Tambah Parameter Baru</span>
-              </button>
-
-              <button
-                type="submit"
-                className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
-              >
-                <Save className="w-4 h-4" />
-                <span>Simpan Prestasi</span>
-              </button>
-            </div>
-          </div>
-        </form>
-      </Card>
-
-      {/* Table Section: Database Prestasi Regional (Matching Screenshot 114015.png) */}
-      <Card className="rounded-2xl overflow-hidden py-0">
-        <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <h2 className="text-lg font-bold text-gray-900">Database Prestasi Regional</h2>
-            <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
-              {filteredList.length} rekor
-            </span>
-          </div>
-
-          {/* Filter Bar & Pills */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Cari atlet..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-gray-200 rounded-lg outline-none focus:border-[#b91c1c]"
+                label="Cabor"
+                value={filterCabor}
+                options={['Semua Cabor', ...caborOptions]}
+                onSelect={setFilterCabor}
               />
             </div>
 
-            <FormSelect
-              label="Cabor"
-              value={filterCabor}
-              options={['Semua Cabor', ...MOCK_CABOR_OPTIONS]}
-              onSelect={setFilterCabor}
-            />
-
-            <FormSelect
-              label="Daerah"
-              value={filterDaerah}
-              options={['Semua Daerah', ...MOCK_REGIONS.map(r => r.kabupaten_kota)]}
-              onSelect={setFilterDaerah}
-            />
+            <div className="shrink-0">
+              <FormSelect
+                label="Daerah"
+                value={filterDaerah}
+                options={['Semua Daerah', ...MOCK_REGIONS.map(r => r.kabupaten_kota)]}
+                onSelect={setFilterDaerah}
+              />
+            </div>
           </div>
         </div>
 
         {/* Table Content */}
-        <div className="overflow-x-auto">
+        <div className="flex-1 overflow-auto">
           <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
+            <thead className="sticky top-0 z-10 bg-slate-50">
+              <tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
                 <th className="py-3.5 px-6">Nama Atlet</th>
                 <th className="py-3.5 px-6">Daerah</th>
                 <th className="py-3.5 px-6">Cabor</th>
                 <th className="py-3.5 px-6">Event</th>
                 <th className="py-3.5 px-6">Medali</th>
-                <th className="py-3.5 px-6 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
               {filteredList.map((item) => {
+                const details = getAtletDetails(item.atlet_id, item.atlet);
                 let medalBadge = '';
-                if (item.medali === 'Emas') {
+                if (item.mendali === 'Emas') {
                   medalBadge = 'bg-amber-100 text-amber-800 border-amber-300';
-                } else if (item.medali === 'Perak') {
+                } else if (item.mendali === 'Perak') {
                   medalBadge = 'bg-slate-100 text-slate-800 border-slate-300';
-                } else if (item.medali === 'Perunggu') {
+                } else if (item.mendali === 'Perunggu') {
                   medalBadge = 'bg-orange-100 text-orange-800 border-orange-300';
                 } else {
                   medalBadge = 'bg-gray-100 text-gray-600 border-gray-200';
@@ -349,33 +286,24 @@ export default function AthletesPage() {
 
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/60 transition">
-                    <td className="py-3.5 px-6 font-bold text-gray-900">{item.nama_atlet}</td>
-                    <td className="py-3.5 px-6 text-gray-600 font-medium">{item.kabupaten_kota}</td>
-                    <td className="py-3.5 px-6 font-semibold text-gray-800">{item.cabor}</td>
+                    <td className="py-3.5 px-6 font-bold text-gray-900">{details.nama}</td>
+                    <td className="py-3.5 px-6 text-gray-600 font-medium">{details.daerah}</td>
+                    <td className="py-3.5 px-6 font-semibold text-gray-800">{details.caborName}</td>
                     <td className="py-3.5 px-6 text-gray-600">
-                      <span>{item.event}</span>
+                      <span>{item.event_kejuaraan}</span>
                       <span className="text-xs text-gray-400 ml-1.5">({item.tahun})</span>
                     </td>
                     <td className="py-3.5 px-6">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold border uppercase tracking-wide ${medalBadge}`}>
-                        {item.medali}
+                        {item.mendali}
                       </span>
-                    </td>
-                    <td className="py-3.5 px-6 text-right">
-                      <button
-                        onClick={() => setSelectedPrestasi(item)}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100"
-                      >
-                        <span>Detail</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </button>
                     </td>
                   </tr>
                 );
               })}
               {filteredList.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-400 text-sm">
+                  <td colSpan={5} className="text-center py-12 text-gray-400 text-sm">
                     Tidak ada data atlet/prestasi yang cocok dengan pencarian filter Anda.
                   </td>
                 </tr>
@@ -384,7 +312,7 @@ export default function AthletesPage() {
           </table>
         </div>
 
-        <div className="px-6 py-3 border-t border-gray-100 bg-slate-50/40 text-xs text-gray-500 flex justify-between items-center">
+        <div className="px-6 py-3 border-t border-gray-100 bg-slate-50 text-xs text-gray-500 flex justify-between items-center shrink-0">
           <span>Menampilkan 1-{filteredList.length} dari {prestasiList.length} hasil</span>
           <div className="flex items-center space-x-1">
             <button className="px-2.5 py-1 rounded bg-white border border-gray-200 text-gray-400 font-bold">&lt;</button>
@@ -394,71 +322,186 @@ export default function AthletesPage() {
         </div>
       </Card>
 
-      {/* JSONB Detail Drawer / Modal */}
-      {selectedPrestasi && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl animate-scale-in">
-            <div className="bg-[#b91c1c] text-white px-6 py-4 flex items-center justify-between">
+      {/* Input Prestasi Modal */}
+      {showInputModal && mounted && createPortal(
+        <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col">
+            <div className="bg-white text-gray-900 border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2">
-                <Code2 className="w-5 h-5 text-amber-300" />
-                <h3 className="font-bold text-base">Detail Skor & Metadata Dinamis (JSONB)</h3>
+                <Trophy className="w-5 h-5 text-[#b91c1c]" />
+                <h3 className="font-bold text-base">Input Prestasi Baru</h3>
               </div>
               <button
-                onClick={() => setSelectedPrestasi(null)}
-                className="text-red-100 hover:text-white hover:bg-red-800 p-1 rounded-lg transition"
+                onClick={() => setShowInputModal(false)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="flex items-start justify-between border-b border-gray-100 pb-4">
-                <div>
-                  <div className="text-xl font-black text-gray-900">{selectedPrestasi.nama_atlet}</div>
-                  <div className="text-xs font-semibold text-gray-500 mt-0.5">
-                    {selectedPrestasi.cabor} • {selectedPrestasi.kabupaten_kota}
+            <form onSubmit={handleAddPrestasi} className="p-6 space-y-6 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="md:col-span-2 flex items-end gap-3">
+                  <div className="flex-1">
+                    {atletOptions.length > 0 ? (
+                      <FormSelect
+                        label="Pilih Atlet"
+                        value={selectedAtletName}
+                        options={atletOptions}
+                        onSelect={setSelectedAtletName}
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500 font-medium pb-2 border-b">
+                        Belum ada data atlet. Silakan tambah atlet baru.
+                      </div>
+                    )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAtletModal(true)}
+                    className="flex-shrink-0 mb-[2px] flex items-center space-x-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs py-3 px-4 rounded-xl transition shadow-sm border border-gray-200"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>Tambah Atlet Baru</span>
+                  </button>
                 </div>
-                <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-bold border border-amber-300 uppercase">
-                  {selectedPrestasi.medali}
-                </span>
-              </div>
 
-              <div>
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                  Struktur Data Kolom `metadata_dinamis` (PostgreSQL JSONB)
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    Nama Event Kejuaraan <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: PON XXI, PORA 2022"
+                    value={event}
+                    onChange={(e) => setEvent(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  />
                 </div>
-                <div className="bg-slate-900 text-emerald-400 font-mono text-xs p-4 rounded-xl overflow-x-auto border border-slate-800 shadow-inner">
-                  <pre>{JSON.stringify(selectedPrestasi.metadata_dinamis, null, 2)}</pre>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Tahun</label>
+                  <input
+                    type="number"
+                    placeholder="YYYY"
+                    value={tahun}
+                    onChange={(e) => setTahun(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  />
+                </div>
+
+                <div>
+                  <FormSelect
+                    label="Tingkat Kompetisi"
+                    value={tingkat}
+                    options={['Daerah', 'Nasional', 'Internasional']}
+                    onSelect={setTingkat}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <FormSelect
+                    label="Jenis Medali"
+                    value={medali}
+                    options={['Emas', 'Perak', 'Perunggu', 'Tanpa Medali']}
+                    onSelect={setMedali}
+                  />
                 </div>
               </div>
+            </form>
 
-              <div className="grid grid-cols-2 gap-3 text-xs text-gray-600 bg-slate-50 p-3 rounded-xl border border-gray-100">
-                <div>
-                  <span className="font-bold text-gray-800">Event:</span> {selectedPrestasi.event}
-                </div>
-                <div>
-                  <span className="font-bold text-gray-800">Tahun:</span> {selectedPrestasi.tahun}
-                </div>
-                <div>
-                  <span className="font-bold text-gray-800">Tingkat:</span> {selectedPrestasi.tingkat}
-                </div>
-                <div>
-                  <span className="font-bold text-gray-800">ID Rekor:</span> #{selectedPrestasi.id}
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end">
+            <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-3 shrink-0">
               <button
-                onClick={() => setSelectedPrestasi(null)}
+                type="button"
+                onClick={() => setShowInputModal(false)}
                 className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
               >
-                Tutup Window
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleAddPrestasi}
+                className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
+              >
+                <Save className="w-4 h-4" />
+                <span>Simpan Prestasi</span>
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Tambah Atlet Modal */}
+      {showAtletModal && mounted && createPortal(
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col">
+            <div className="bg-white text-gray-900 border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2">
+                <UserPlus className="w-5 h-5 text-[#b91c1c]" />
+                <h3 className="font-bold text-base">Registrasi Atlet Baru</h3>
+              </div>
+              <button
+                onClick={() => setShowAtletModal(false)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddAtlet} className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  Nama Lengkap <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Masukkan nama atlet"
+                  value={newAtletNama}
+                  onChange={(e) => setNewAtletNama(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                />
+              </div>
+
+              <div>
+                <FormSelect
+                  label="Cabang Olahraga"
+                  value={newAtletCabor}
+                  options={caborOptions}
+                  onSelect={setNewAtletCabor}
+                />
+              </div>
+
+              <div>
+                <FormSelect
+                  label="Asal Kabupaten / Kota"
+                  value={newAtletDaerah}
+                  options={MOCK_REGIONS.map(r => r.kabupaten_kota)}
+                  onSelect={setNewAtletDaerah}
+                />
+              </div>
+            </form>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowAtletModal(false)}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleAddAtlet}
+                className="flex items-center space-x-2 bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
+              >
+                <Save className="w-4 h-4" />
+                <span>Daftarkan Atlet</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

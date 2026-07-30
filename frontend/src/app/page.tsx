@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { 
   AlertTriangle, 
-  ChevronRight, 
-  TrendingUp
+  ChevronRight 
 } from 'lucide-react';
 import { 
   Chart as ChartJS, 
@@ -22,16 +21,8 @@ import { Line } from 'react-chartjs-2';
 import DashboardStatCard from '@/components/DashboardStatCard';
 import { Card } from '@/components/ui/card';
 import { ExpandableCard } from '@/components/ui/expandable-card';
-import { DropdownFilter } from '@/components/ui/dropdown-filter';
 import StatDetailPanel from '@/components/StatDetailPanel';
-import {
-  MOCK_REGIONS,
-  MOCK_KEPENGURUSAN,
-  MOCK_PRESTASI,
-  MOCK_DASHBOARD_LINE_TREND,
-  MOCK_CABOR_OPTIONS,
-  RegionMedal,
-} from '@/data/mockData';
+import { MOCK_REGIONS, RegionMedal, MOCK_DASHBOARD_LINE_TREND } from '@/data/mockData';
 
 const AcehMap = dynamic(() => import('@/components/AcehMap'), { 
   ssr: false,
@@ -54,74 +45,138 @@ ChartJS.register(
   Filler
 );
 
+interface DashboardData {
+  totalAtlet: number;
+  totalCabor: number;
+  totalPrestasi: number;
+  totalKepengurusan: number;
+  medalsByRegion: { kabupaten_kota: string; total_emas: number; total_perak: number; total_perunggu: number }[];
+}
+
+interface ExpiringSK {
+  id: number;
+  cabor: string;
+  nomor_sk: string;
+  days_to_expire: number;
+}
+
 export default function DashboardPage() {
-  const [selectedCabor, setSelectedCabor] = useState('Semua Cabang Olahraga');
-  const [selectedRegion, setSelectedRegion] = useState('Semua Kabupaten/Kota');
-  const [appliedSelectedCabor, setAppliedSelectedCabor] = useState('Semua Cabang Olahraga');
-  const [appliedSelectedRegion, setAppliedSelectedRegion] = useState('Semua Kabupaten/Kota');
-  const [activeRegion, setActiveRegion] = useState<RegionMedal | null>(MOCK_REGIONS[0]);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [activeRegion, setActiveRegion] = useState<RegionMedal | null>(null);
   const [activeStatCard, setActiveStatCard] = useState<string | null>(null);
+  const [expiringSK, setExpiringSK] = useState<ExpiringSK[]>([]);
+
+  useEffect(() => {
+    // Fetch Dashboard stats
+    fetch('/api/dashboard')
+      .then(res => res.json())
+      .then(data => {
+        setDashboardData(data.data || data);
+      })
+      .catch(console.error);
+
+    // Fetch Kepengurusan to calculate EWS
+    fetch('/api/kepengurusan')
+      .then(res => res.json())
+      .then(async (data) => {
+        const arr = Array.isArray(data) ? data : data.data || [];
+        
+        // Also need cabor to map cabor_id to cabor string
+        const caborRes = await fetch('/api/cabor');
+        const caborData = await caborRes.json();
+        const caborList = Array.isArray(caborData) ? caborData : caborData.data || [];
+
+        const today = new Date();
+        const expiring: ExpiringSK[] = [];
+
+        arr.forEach((sk: any) => {
+          if (sk.status_kepengurusan === 'Aktif') {
+            const masaBakti = sk.masa_bakti || '';
+            const endYearStr = masaBakti.split('-')[1];
+            if (endYearStr) {
+              const endYear = parseInt(endYearStr);
+              const endDate = new Date(endYear, 11, 31); // Dec 31 of end year
+              const diffTime = endDate.getTime() - today.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              
+              if (diffDays <= 90 && diffDays >= 0) {
+                 const caborObj = caborList.find((c: any) => c.id === sk.cabor_id);
+                 expiring.push({
+                    id: sk.id,
+                    cabor: caborObj ? caborObj.nama_cabor : 'Unknown Cabor',
+                    nomor_sk: sk.nomor_sk,
+                    days_to_expire: diffDays
+                 });
+              }
+            }
+          }
+        });
+
+        // sort by days_to_expire asc
+        expiring.sort((a, b) => a.days_to_expire - b.days_to_expire);
+        setExpiringSK(expiring);
+      })
+      .catch(console.error);
+  }, []);
 
   const handleSelectRegion = (region: RegionMedal) => {
     setActiveRegion(prev => prev?.id === region.id ? null : region);
   };
 
-  const filteredPrestasi = useMemo(() => {
-    return MOCK_PRESTASI.filter((item) => {
-      const matchCabor = appliedSelectedCabor === 'Semua Cabang Olahraga' || item.cabor === appliedSelectedCabor;
-      const matchRegion = appliedSelectedRegion === 'Semua Kabupaten/Kota' || item.kabupaten_kota === appliedSelectedRegion;
+  // Map API medalsByRegion to MOCK_REGIONS structure for rendering
+  const mappedRegions = useMemo(() => {
+    return MOCK_REGIONS.map(mockR => {
+      // Jika dashboardData belum ada atau medalsByRegion tidak ada/kosong, set ke 0
+      const apiR = dashboardData?.medalsByRegion?.find(r => r.kabupaten_kota === mockR.kabupaten_kota);
+      if (apiR) {
+        return {
+          ...mockR,
+          total_emas: apiR.total_emas || 0,
+          total_perak: apiR.total_perak || 0,
+          total_perunggu: apiR.total_perunggu || 0
+        };
+      }
+      return { ...mockR, total_emas: 0, total_perak: 0, total_perunggu: 0 };
+    }).sort((a, b) => b.total_emas - a.total_emas);
+  }, [dashboardData]);
 
-      return matchCabor && matchRegion;
-    });
-  }, [appliedSelectedCabor, appliedSelectedRegion]);
+  // If activeRegion is set but not updated with API data, update it
+  useEffect(() => {
+    if (activeRegion && dashboardData) {
+      const updated = mappedRegions.find(r => r.id === activeRegion.id);
+      if (updated && (updated.total_emas !== activeRegion.total_emas || updated.total_perak !== activeRegion.total_perak)) {
+         setActiveRegion(updated);
+      }
+    } else if (!activeRegion && dashboardData) {
+      setActiveRegion(mappedRegions[0]);
+    }
+  }, [dashboardData, mappedRegions, activeRegion]);
 
-  const filteredRegions = useMemo(() => {
-    return MOCK_REGIONS.filter(r => {
-      const matchRegion = appliedSelectedRegion === 'Semua Kabupaten/Kota' || r.kabupaten_kota === appliedSelectedRegion;
-      return matchRegion;
-    });
-  }, [appliedSelectedRegion]);
 
-  const caborOptions = useMemo(() => {
-    return ['Semua Cabang Olahraga', ...MOCK_CABOR_OPTIONS];
-  }, []);
-
-  const totalAtlet = useMemo(() => new Set(filteredPrestasi.map((item) => item.nama_atlet)).size, [filteredPrestasi]);
-  const totalCabor = useMemo(() => new Set(filteredPrestasi.map((item) => item.cabor)).size, [filteredPrestasi]);
-  const totalEvent = useMemo(() => new Set(filteredPrestasi.map((item) => item.event)).size, [filteredPrestasi]);
-  const totalEmas = useMemo(
-    () => filteredRegions.reduce((acc, region) => acc + region.total_emas, 0),
-    [filteredRegions]
-  );
-  const expiringSK = useMemo(() => MOCK_KEPENGURUSAN.filter(k => k.days_to_expire && k.days_to_expire <= 90), []);
-
-  const handleApplyFilter = () => {
-    setAppliedSelectedCabor(selectedCabor);
-    setAppliedSelectedRegion(selectedRegion);
-  };
+  const totalEmas = useMemo(() => mappedRegions.reduce((acc, region) => acc + region.total_emas, 0), [mappedRegions]);
 
   const statCards = [
     {
       id: 'atlet',
-      value: totalAtlet,
+      value: dashboardData?.totalAtlet || 0,
       title: 'Total Atlet Terdaftar',
-      increase: 'Hasil filter aktif',
+      increase: 'Live Data',
       delay: '0ms',
       variant: 'default' as const,
     },
     {
       id: 'cabor',
-      value: totalCabor,
-      title: 'Total Cabang Olahraga Aktif',
-      increase: 'Hasil filter aktif',
+      value: dashboardData?.totalCabor || 0,
+      title: 'Total Cabang Olahraga',
+      increase: 'Live Data',
       delay: '100ms',
       variant: 'default' as const,
     },
     {
-      id: 'event',
-      value: totalEvent,
-      title: 'Total Event Kejuaraan',
-      increase: 'Hasil filter aktif',
+      id: 'prestasi',
+      value: dashboardData?.totalPrestasi || 0,
+      title: 'Total Prestasi',
+      increase: 'Live Data',
       delay: '200ms',
       variant: 'default' as const,
     },
@@ -129,20 +184,19 @@ export default function DashboardPage() {
       id: 'emas',
       value: totalEmas,
       title: 'Total Medali Emas Regional',
-      increase: 'Dari wilayah terfilter',
+      increase: 'Live Data',
       delay: '300ms',
       variant: 'default' as const,
     },
   ];
 
-  const statDetailData = useMemo(() => ({
-    atlet: [...new Set(filteredPrestasi.map(i => i.nama_atlet))].map(name => ({ label: name })),
-    cabor: [...new Set(filteredPrestasi.map(i => i.cabor))].map(name => ({ label: name })),
-    event: [...new Set(filteredPrestasi.map(i => i.event))].map(name => ({ label: name })),
-    emas: filteredRegions.map(r => ({ label: r.kabupaten_kota, highlight: `${r.total_emas} emas` })),
-  }), [filteredPrestasi, filteredRegions]);
+  const statDetailData = {
+    atlet: [], 
+    cabor: [],
+    prestasi: [],
+    emas: mappedRegions.map(r => ({ label: r.kabupaten_kota, highlight: `${r.total_emas} emas` })),
+  };
 
-  // Line chart — Tren Performa Medali Tahunan (matching design red line)
   const lineChartData = {
     labels: MOCK_DASHBOARD_LINE_TREND.labels,
     datasets: [
@@ -185,30 +239,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-        <DropdownFilter
-          label="Cabang Olahraga"
-          value={selectedCabor}
-          options={caborOptions}
-          onSelect={setSelectedCabor}
-        />
-        <DropdownFilter
-          label="Kabupaten/Kota"
-          value={selectedRegion}
-          options={['Semua Kabupaten/Kota', ...MOCK_REGIONS.map(r => r.kabupaten_kota)]}
-          onSelect={setSelectedRegion}
-        />
-        <button
-          type="button"
-          onClick={handleApplyFilter}
-          className="py-3 px-6 bg-[#dc2626] hover:bg-red-700 text-white font-bold text-sm rounded-2xl transition shadow-md"
-        >
-          Terapkan Filter
-        </button>
-      </div>
-
-      {/* 4 KPI Cards — 2x2 grid matching design 113914.png */}
+      {/* 4 KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {statCards.map((card) => (
           <DashboardStatCard
@@ -219,12 +250,14 @@ export default function DashboardPage() {
             delay={card.delay}
             variant={card.variant}
             isActive={activeStatCard === card.id}
-            onClick={() => setActiveStatCard(prev => prev === card.id ? null : card.id)}
+            onClick={() => {
+               if (card.id === 'emas') setActiveStatCard(prev => prev === card.id ? null : card.id);
+            }}
           />
         ))}
       </div>
 
-      {/* Detail Modal — full screen overlay */}
+      {/* Detail Modal */}
       {activeStatCard && (
         <StatDetailPanel
           title={statCards.find(c => c.id === activeStatCard)?.title ?? ''}
@@ -234,18 +267,17 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Peta — Map as main content, cards floating on sides */}
+      {/* Peta */}
       <Card className="relative overflow-hidden h-[650px] lg:h-[720px] animate-slide-in-up">
-        {/* Map — full width/height */}
         <div className="absolute inset-0">
           <AcehMap 
-            regions={filteredRegions} 
+            regions={mappedRegions} 
             activeRegion={activeRegion} 
             onSelectRegion={(region) => handleSelectRegion(region)} 
           />
         </div>
 
-        {/* Floating card — Wilayah Terpilih (left) */}
+        {/* Floating card — Wilayah Terpilih */}
         <Card className={`absolute left-4 top-20 w-[240px] xl:w-[260px] p-4 bg-white/95 backdrop-blur-sm shadow-md z-20 transition-all duration-300 ease-in-out ${
           activeRegion
             ? 'opacity-100 translate-x-0 scale-100'
@@ -279,10 +311,10 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        {/* Floating card — Daftar 23 Wilayah (right) */}
+        {/* Floating card — Daftar 23 Wilayah */}
         <ExpandableCard title="Daftar 23 Wilayah">
           <div className="grid grid-cols-1 gap-2">
-            {filteredRegions.map((region) => {
+            {mappedRegions.map((region) => {
               const isSelected = activeRegion?.id === region.id;
               return (
                 <button
@@ -314,7 +346,7 @@ export default function DashboardPage() {
         </ExpandableCard>
       </Card>
 
-      {/* Tren Performa Medali Tahunan — Line chart matching design */}
+      {/* Tren Performa Medali Tahunan */}
       <Card className="p-5">
         <h2 className="text-base font-bold text-gray-900 mb-4">Tren Performa Medali Tahunan</h2>
         <div className="h-[220px] w-full">
@@ -322,7 +354,7 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      {/* EWS — Early Warning System SK Kedaluwarsa (matching right panel in 113956.png) */}
+      {/* EWS */}
       <Card className="p-5">
         <div className="flex items-center space-x-2 pb-3 mb-3 border-b border-gray-100">
           <AlertTriangle className="w-5 h-5 text-[#dc2626] shrink-0" />
@@ -332,25 +364,29 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {expiringSK.map((item) => {
-            const isUrgent = (item.days_to_expire ?? 99) <= 14;
-            return (
-              <div
-                key={item.id}
-                className={`p-3 rounded-lg border-l-4 ${
-                  isUrgent
-                    ? 'bg-red-50 border-red-600'
-                    : 'bg-amber-50 border-amber-500'
-                }`}
-              >
-                <div className="font-bold text-xs text-[#dc2626]">{item.cabor}</div>
-                <div className="text-[11px] text-gray-600 mt-0.5">Kedaluwarsa dalam {item.days_to_expire} hari.</div>
-                <div className="text-[10px] text-gray-500 mt-0.5">Nomor SK: {item.nomor_sk}</div>
-              </div>
-            );
-          })}
-        </div>
+        {expiringSK.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {expiringSK.map((item) => {
+              const isUrgent = item.days_to_expire <= 14;
+              return (
+                <div
+                  key={item.id}
+                  className={`p-3 rounded-lg border-l-4 ${
+                    isUrgent
+                      ? 'bg-red-50 border-red-600'
+                      : 'bg-amber-50 border-amber-500'
+                  }`}
+                >
+                  <div className="font-bold text-xs text-[#dc2626]">{item.cabor}</div>
+                  <div className="text-[11px] text-gray-600 mt-0.5">Kedaluwarsa dalam {item.days_to_expire} hari.</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">Nomor SK: {item.nomor_sk}</div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500 py-4 text-center">Tidak ada SK kepengurusan yang akan kedaluwarsa dalam 3 bulan.</div>
+        )}
 
         <div className="mt-4 pt-3 border-t border-gray-100">
           <a

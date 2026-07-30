@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, Trophy, Home, LogOut } from 'lucide-react'
+import { LayoutDashboard, Trophy, Home, LogOut, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 import Link from 'next/link'
@@ -18,16 +18,36 @@ const generalItems = [
 ]
 
 export default function Navbar({ children }: { children: React.ReactNode }) {
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const pathname = usePathname()
 
   return (
-    <div className="flex min-h-screen w-full">
-      <aside className="fixed top-0 left-0 w-64 bg-card border-r border-gray-200 p-4 h-screen overflow-y-auto lg:block z-40">
-        {/* Logo */}
-        <div className="flex items-center gap-2 mb-6 group cursor-pointer">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center transition-transform group-hover:scale-110 duration-300 overflow-hidden">
+    <div
+      className="min-h-screen w-full"
+      style={{
+        backgroundImage: 'url(/img/background.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed',
+      }}
+    >
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed top-0 left-0 h-screen bg-card border-r border-gray-200 z-40 transition-all duration-300 ease-in-out flex flex-col",
+          sidebarOpen ? "w-52 p-4" : "w-[63px] p-3"
+        )}
+      >
+        {/* Logo + Toggle */}
+        <div className="flex items-center justify-between mb-6">
+          <Link href="/" className="flex items-center gap-2 group" onClick={(e) => {
+            if (!sidebarOpen) {
+              e.preventDefault();
+              setSidebarOpen(true);
+            }
+          }}>
+            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center transition-transform group-hover:scale-110 duration-300 overflow-hidden shrink-0">
               <Image
                 src="/img/koni-logo.png"
                 alt="KONI Aceh"
@@ -36,14 +56,28 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                 className="object-cover"
               />
             </div>
-            <span className="text-lg font-semibold text-gray-900">KONI</span>
+            <span className={cn(
+              "text-lg font-semibold text-gray-900 whitespace-nowrap transition-opacity duration-300",
+              sidebarOpen ? "opacity-100" : "opacity-0"
+            )}>KONI</span>
           </Link>
+          {sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
+            >
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          )}
         </div>
 
         {/* Menu Section */}
-        <div className="space-y-4">
+        <div className="space-y-4 flex-1">
           <div>
-            <p className="text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wider">Menu</p>
+            <p className={cn(
+              "text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wider whitespace-nowrap transition-opacity duration-300",
+              sidebarOpen ? "opacity-100" : "opacity-0"
+            )}>Menu</p>
             <nav className="space-y-0.5">
               {menuItems.map((item) => {
                 const isActive = pathname === item.href
@@ -51,18 +85,18 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.label}
                     href={item.href}
-                    onMouseEnter={() => setHoveredItem(item.label)}
-                    onMouseLeave={() => setHoveredItem(null)}
                     className={cn(
                       'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                       isActive
                         ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
                         : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
-                      hoveredItem === item.label && !isActive && 'translate-x-1',
                     )}
                   >
-                    <item.icon className="w-4 h-4" />
-                    <span className="text-sm">{item.label}</span>
+                    <item.icon className="w-4 h-4 shrink-0" />
+                    <span className={cn(
+                      "text-sm whitespace-nowrap transition-opacity duration-300",
+                      sidebarOpen ? "opacity-100" : "opacity-0"
+                    )}>{item.label}</span>
                   </Link>
                 )
               })}
@@ -71,22 +105,25 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
 
           {/* General Section */}
           <div>
-            <p className="text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wider">General</p>
+            <p className={cn(
+              "text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wider whitespace-nowrap transition-opacity duration-300",
+              sidebarOpen ? "opacity-100" : "opacity-0"
+            )}>General</p>
             <nav className="space-y-0.5">
               {generalItems.map((item) => {
                 return (
                   <Link
                     key={item.label}
                     href={item.href}
-                    onMouseEnter={() => setHoveredItem(item.label)}
-                    onMouseLeave={() => setHoveredItem(null)}
                     className={cn(
                       'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200',
-                      hoveredItem === item.label && 'translate-x-1',
                     )}
                   >
-                    <item.icon className="w-4 h-4" />
-                    <span className="text-sm">{item.label}</span>
+                    <item.icon className="w-4 h-4 shrink-0" />
+                    <span className={cn(
+                      "text-sm whitespace-nowrap transition-opacity duration-300",
+                      sidebarOpen ? "opacity-100" : "opacity-0"
+                    )}>{item.label}</span>
                   </Link>
                 )
               })}
@@ -95,18 +132,14 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main Content Area — Background image */}
+      {/* Main Content Area */}
       <main
-        className="flex-1 ml-64 overflow-y-auto"
-        style={{
-          backgroundImage: 'url(/img/background.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed',
-        }}
+        className={cn(
+          "min-h-screen overflow-y-auto transition-all duration-300 ease-in-out flex flex-col",
+          sidebarOpen ? "ml-52" : "ml-[63px]"
+        )}
       >
-        <div className="min-h-full bg-white/85 backdrop-blur-xs p-6 lg:p-8">
+        <div className="flex-1 bg-white/85 backdrop-blur-xs p-6 lg:p-8">
           {children}
         </div>
       </main>

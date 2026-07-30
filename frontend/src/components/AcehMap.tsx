@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { MapContainer, Marker, GeoJSON, TileLayer } from 'react-leaflet';
+import { MapContainer, Marker, GeoJSON, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { RegionMedal } from '@/data/mockData';
@@ -119,6 +119,17 @@ export default function AcehMap({ regions, activeRegion, onSelectRegion }: AcehM
 
   const hasSelection = activeRegion?.id;
 
+  function ResizeHandler() {
+    const map = useMap();
+    useEffect(() => {
+      const container = map.getContainer();
+      const observer = new ResizeObserver(() => map.invalidateSize());
+      observer.observe(container);
+      return () => observer.disconnect();
+    }, [map]);
+    return null;
+  }
+
   return (
     <div className="w-full h-full min-h-[560px] rounded-2xl overflow-hidden relative z-10 flex flex-col">
       {/* Header Overlay */}
@@ -157,6 +168,7 @@ export default function AcehMap({ regions, activeRegion, onSelectRegion }: AcehM
           attributionControl={false}
           style={{ height: '100%', width: '100%' }}
         >
+          <ResizeHandler />
           {/* Satellite tiles — Esri World Imagery */}
           <TileLayer
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
