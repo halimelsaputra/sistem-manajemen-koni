@@ -1,4 +1,5 @@
 import { CaborRepository } from "@/repositories/cabor.repository";
+import { ValidationError } from "@/lib/errors";
 
 export const CaborService = {
     /**
@@ -23,7 +24,7 @@ export const CaborService = {
      */
     async create(data: { nama_cabor: string }) {
         if (!data.nama_cabor || data.nama_cabor.trim() === "") {
-            throw new Error("Nama cabang olahraga (nama_cabor) wajib diisi.");
+            throw new ValidationError("Nama cabang olahraga (nama_cabor) wajib diisi.");
         }
         return await CaborRepository.create({
             nama_cabor: data.nama_cabor.trim()
@@ -37,7 +38,7 @@ export const CaborService = {
      */
     async update(id: string, data: { nama_cabor: string }) {
         if (!data.nama_cabor || data.nama_cabor.trim() === "") {
-            throw new Error("Nama cabang olahraga (nama_cabor) wajib diisi.");
+            throw new ValidationError("Nama cabang olahraga (nama_cabor) wajib diisi.");
         }
         return await CaborRepository.update(id, {
             nama_cabor: data.nama_cabor.trim()

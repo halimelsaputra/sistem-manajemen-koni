@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrestasiService } from "@/services/prestasi.service";
+import { ValidationError } from "@/lib/errors";
 
 /**
  * Endpoint GET /api/prestasi/[id]
@@ -67,6 +68,15 @@ export async function PUT(
             { status: 200 }
         );
     } catch (error: any) {
+        if (error instanceof ValidationError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: error.message
+                },
+                { status: 400 }
+            );
+        }
         console.error(`Gagal memperbarui data prestasi dengan ID:`, error);
         return NextResponse.json(
             {

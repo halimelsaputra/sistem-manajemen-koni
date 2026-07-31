@@ -1,4 +1,5 @@
 import { KepengurusanRepository } from "@/repositories/kepengurusan.repository";
+import { ValidationError } from "@/lib/errors";
 
 export const KepengurusanService = {
     /**
@@ -34,14 +35,14 @@ export const KepengurusanService = {
     }) {
         // Validasi field wajib
         if (!data.cabor_id || !data.masa_bakti || !data.nomor_sk || !data.tanggal_sk || !data.ketua_umum || !data.sekretaris) {
-            throw new Error("Field cabor_id, masa_bakti, nomor_sk, tanggal_sk, ketua_umum, dan sekretaris wajib diisi.");
+            throw new ValidationError("Field cabor_id, masa_bakti, nomor_sk, tanggal_sk, ketua_umum, dan sekretaris wajib diisi.");
         }
 
         // Validasi status_kepengurusan
         if (data.status_kepengurusan) {
             const validStatus = ["Aktif", "Berakhir"];
             if (!validStatus.includes(data.status_kepengurusan)) {
-                throw new Error("status_kepengurusan tidak valid. Harus salah satu dari: Aktif, Berakhir.");
+                throw new ValidationError("status_kepengurusan tidak valid. Harus salah satu dari: Aktif, Berakhir.");
             }
         }
 
@@ -81,7 +82,7 @@ export const KepengurusanService = {
         if (data.status_kepengurusan) {
             const validStatus = ["Aktif", "Berakhir"];
             if (!validStatus.includes(data.status_kepengurusan)) {
-                throw new Error("status_kepengurusan tidak valid. Harus salah satu dari: Aktif, Berakhir.");
+                throw new ValidationError("status_kepengurusan tidak valid. Harus salah satu dari: Aktif, Berakhir.");
             }
         }
 

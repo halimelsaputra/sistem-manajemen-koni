@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { KepengurusanService } from "@/services/kepengurusan.service";
+import { ValidationError } from "@/lib/errors";
 
 /**
  * Endpoint GET /api/kepengurusan
@@ -14,22 +15,11 @@ export async function GET(req: Request) {
 
         const data = await KepengurusanService.getAll({ cabor_id, status_kepengurusan, search });
 
-        if (!data || data.length === 0) {
-            return NextResponse.json(
-                {
-                    status: "fail",
-                    message: "tidak menemukan data kepengurusan",
-                    data: []
-                },
-                { status: 404 }
-            );
-        }
-
         return NextResponse.json(
             {
                 status: "success",
-                message: "data kepengurusan berhasil diambil",
-                data: data
+                message: data && data.length > 0 ? "data kepengurusan berhasil diambil" : "tidak menemukan data kepengurusan",
+                data: data ?? []
             },
             { status: 200 }
         );
@@ -65,6 +55,15 @@ export async function POST(req: Request) {
             { status: 201 }
         );
     } catch (error: any) {
+        if (error instanceof ValidationError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: error.message
+                },
+                { status: 400 }
+            );
+        }
         console.error("Gagal menambahkan data kepengurusan:", error);
         return NextResponse.json(
             {

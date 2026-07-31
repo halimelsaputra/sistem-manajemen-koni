@@ -1,0 +1,150 @@
+================================================================================
+          ARSITEKTUR, RELASI DATABASE, DAN ALUR DATA BACKEND KONI
+================================================================================
+
+Dokumen ini menjelaskan secara rinci tentang arsitektur backend, struktur relasi 
+tabel database (Entity-Relationship), dan alur perjalanan data (Data Flow) pada 
+sistem manajemen KONI.
+
+--------------------------------------------------------------------------------
+1. ARSITEKTUR BACKEND
+--------------------------------------------------------------------------------
+Backend dibangun menggunakan Next.js (App Router) dengan TypeScript yang terhubung 
+langsung ke Supabase (PostgreSQL). Implementasinya menggunakan pola pemisahan 
+tanggung jawab (Separation of Concerns) dalam 3 layer utama:
+
+1. API Route Handler (app/api/.../route.ts)
+   - Menjadi entry point HTTP Request dari Front-End.
+   - Bertanggung jawab mem-parsing parameter (query params untuk filter, URL id, 
+     dan JSON request body).
+   - Mengirimkan HTTP Response dengan format JSON yang konsisten.
+
+2. Service Layer (services/*.service.ts)
+   - Menangani aturan bisnis (Business Logic) dan validasi data dasar.
+   - Memastikan data yang wajib diisi telah dikirimkan, serta memvalidasi tipe enum
+     (seperti status_kepengurusan, tingkat_lomba, dan mendali) sebelum diteruskan.
+
+3. Repository Layer (repositories/*.repository.ts)
+   - Berinteraksi langsung dengan database melalui client Supabase JS.
+   - Membangun kueri database secara dinamis (kondisional) berdasarkan parameter 
+     filter yang diberikan dari layer atasnya.
+
+--------------------------------------------------------------------------------
+2. SKEMA DAN RELASI DATABASE (ENTITY-RELATIONSHIP)
+--------------------------------------------------------------------------------
+
+Database PostgreSQL di Supabase memiliki 4 tabel utama dan 1 Materialized View:
+
+   +------------------+          +------------------+
+   |      cabor       |          |   kepengurusan   |
+   +------------------+          +------------------+
+   | id (PK)          |<---------| id (PK)          |
+   | nama_cabor       |1        *| cabor_id (FK)    |
+   | created_at       |          | masa_bakti       |
+   | updated_at       |          | nomor_sk         |
+   +------------------+          | tanggal_sk       |
+            |                    | ketua_umum       |
+            | 1                  | ketua_harian     |
+            |                    | sekretaris       |
+            | *                  | file_path_sk     |
+   +------------------+          | status_kepengur. |
+   |      atlet       |          +------------------+
+   +------------------+
+   | id (PK)          |
+   | nama_atlet       |
+   | kabupaten_kota   |
+   | cabor_id (FK)    |
+   +------------------+
+            | 1
+            |
+            | *
+   +------------------+          +------------------------+
+   |     prestasi     |          |  mv_medals_by_region   |
+   +------------------+          |  (Materialized View)   |
+   | id (PK)          |          +------------------------+
+   | atlet_id (FK)    |          | kabupaten_kota (Unique)|
+   | event_kejuaraan  |          | total_emas             |
+   | tahun            |          | total_perak            |
+   | tingkat_lomba    |          | total_perunggu         |
+   | mendali          |          +------------------------+
+   +------------------+
+
+Detail Tabel & Relasi:
+
+1. cabor (Cabang Olahraga)
+   - Deskripsi: Menyimpan daftar cabang olahraga (contoh: Pencak Silat, Atletik).
+   - Relasi:
+     - One-to-Many ke tabel `atlet` (Satu cabor diikuti oleh banyak atlet).
+     - One-to-Many ke tabel `kepengurusan` (Satu cabor memiliki riwayat kepengurusan).
+
+2. atlet (Profil Atlet)
+   - Deskripsi: Menyimpan profil atlet dan kota asal.
+   - Relasi:
+     - Many-to-One ke tabel `cabor` via foreign key `cabor_id` (Setiap atlet wajib
+       terikat pada satu cabor). Batasan: ON DELETE RESTRICT (Cabor tidak bisa 
+       dihapus jika masih memiliki atlet).
+     - One-to-Many ke tabel `prestasi` (Satu atlet bisa memiliki banyak prestasi).
+
+3. kepengurusan (Kepengurusan Cabor)
+   - Deskripsi: Menyimpan data kepengurusan dan dokumen SK kepengurusan.
+   - Relasi:
+     - Many-to-One ke tabel `cabor` via foreign key `cabor_id`.
+   - Aturan Bisnis Khusus (Trigger Database):
+     - Memiliki trigger `trg_update_status_kepengurusan` di PostgreSQL. Ketika ada
+       kepengurusan BARU yang di-insert dengan status 'Aktif', trigger otomatis 
+       mengubah seluruh kepengurusan LAMA untuk cabor yang sama menjadi 'Berakhir'.
+       Ini menjamin hanya ada satu kepengurusan aktif per cabor secara real-time.
+
+4. prestasi (Daftar Prestasi Atlet)
+   - Deskripsi: Menyimpan medali dan kejuaraan yang pernah diraih oleh atlet.
+   - Relasi:
+     - Many-to-One ke tabel `atlet` via foreign key `atlet_id`. 
+     - Relasi ke `cabor` terhubung secara tidak langsung melalui relasi `atlet`.
+
+5. mv_medals_by_region (Materialized View)
+   - Deskripsi: Agregasi perolehan medali (Emas, Perak, Perunggu) berdasarkan 
+     kabupaten/kota atlet.
+   - Cara Kerja: Menggabungkan (JOIN) tabel `prestasi` dan `atlet`, dikelompokkan 
+     berdasarkan `kabupaten_kota`. Digunakan oleh endpoint Dashboard untuk respon 
+     cepat tanpa harus menghitung ulang seluruh baris data prestasi secara manual.
+
+--------------------------------------------------------------------------------
+3. ALUR PERJALANAN DATA (DATA FLOW)
+--------------------------------------------------------------------------------
+
+A. Alur Pembacaan Data & Filtering (GET Request)
+   1. Front-End memanggil REST API dengan parameter filter, contoh:
+      GET /api/prestasi?tingkat_lomba=Nasional&mendali=Emas&search=PON
+   2. API Route Handler menerima request, mem-parsing query parameter tersebut.
+   3. Service menerima parameter filter sebagai objek:
+      { tingkat_lomba: "Nasional", mendali: "Emas", search: "PON" }
+   4. Repository mengevaluasi kunci filter yang terisi, lalu membangun query
+      Supabase secara dinamis:
+      - Menambahkan `.eq("tingkat_lomba", "Nasional")`
+      - Menambahkan `.eq("mendali", "Emas")`
+      - Menambahkan `.ilike("event_kejuaraan", "%PON%")`
+   5. Supabase mengeksekusi query dan mengembalikan data ke Repository.
+   6. API membungkus data tersebut ke dalam format standard JSON dan mengirimkannya
+      kembali ke Front-End.
+
+B. Alur Penulisan Data (POST & PUT Request)
+   1. Front-End mengirimkan JSON payload melalui body request, contoh POST /api/atlet.
+   2. API Route Handler mem-parsing JSON body dan meneruskannya ke Service.
+   3. Service melakukan validasi:
+      - Memastikan `nama_atlet`, `kabupaten_kota`, dan `cabor_id` tidak kosong.
+      - Jika validasi gagal, melempar error dan API langsung merespon dengan status 
+        HTTP 400/500 beserta pesan kesalahannya.
+   4. Repository mengirim data baru ke Supabase untuk disimpan.
+   5. Supabase melakukan verifikasi integritas data database (contoh: mengecek 
+      apakah `cabor_id` yang dimasukkan benar-benar ada di tabel `cabor`).
+   6. Supabase menyimpan data baru dan mengirimkan row yang berhasil dibuat kembali
+      ke backend, yang kemudian dikirimkan sebagai respon HTTP 201 Created ke Front-End.
+
+C. Alur Agregasi Dashboard
+   1. Front-End memanggil GET /api/dashboard.
+   2. Route Handler memanggil Promise.all untuk mengambil:
+      - Jumlah total baris dari tabel `atlet`, `cabor`, `prestasi`, `kepengurusan`.
+      - Data perolehan medali daerah langsung dari Materialized View `mv_medals_by_region`.
+   3. Data digabungkan dalam satu objek respon untuk memuat statistik halaman 
+      utama secara instan.
+================================================================================

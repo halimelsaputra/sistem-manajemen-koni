@@ -1,4 +1,5 @@
 import { AtletRepository } from "@/repositories/atlet.repository";
+import { ValidationError } from "@/lib/errors";
 
 export const AtletService = {
     /**
@@ -24,7 +25,7 @@ export const AtletService = {
     async create(data: { nama_atlet: string; kabupaten_kota: string; cabor_id: number }) {
         // Validasi dasar
         if (!data.nama_atlet || !data.kabupaten_kota || !data.cabor_id) {
-            throw new Error("Field nama_atlet, kabupaten_kota, dan cabor_id wajib diisi.");
+            throw new ValidationError("Field nama_atlet, kabupaten_kota, dan cabor_id wajib diisi.");
         }
         return await AtletRepository.create(data);
     },

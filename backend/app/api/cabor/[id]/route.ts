@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { CaborService } from "@/services/cabor.service";
+import { ValidationError } from "@/lib/errors";
 
 /**
  * Endpoint GET /api/cabor/[id]
@@ -67,6 +68,15 @@ export async function PUT(
             { status: 200 }
         );
     } catch (error: any) {
+        if (error instanceof ValidationError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: error.message
+                },
+                { status: 400 }
+            );
+        }
         console.error(`Gagal memperbarui data cabor dengan ID:`, error);
         return NextResponse.json(
             {

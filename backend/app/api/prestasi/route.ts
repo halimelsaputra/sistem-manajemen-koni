@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrestasiService } from "@/services/prestasi.service";
+import { ValidationError } from "@/lib/errors";
 
 /**
  * Endpoint GET /api/prestasi
@@ -16,22 +17,11 @@ export async function GET(req: Request) {
 
         const data = await PrestasiService.getAll({ atlet_id, tingkat_lomba, mendali, tahun, search });
 
-        if (!data || data.length === 0) {
-            return NextResponse.json(
-                {
-                    status: "fail",
-                    message: "tidak menemukan data prestasi",
-                    data: []
-                },
-                { status: 404 }
-            );
-        }
-
         return NextResponse.json(
             {
                 status: "success",
-                message: "data prestasi berhasil diambil",
-                data: data
+                message: data && data.length > 0 ? "data prestasi berhasil diambil" : "tidak menemukan data prestasi",
+                data: data ?? []
             },
             { status: 200 }
         );
@@ -67,6 +57,15 @@ export async function POST(req: Request) {
             { status: 201 }
         );
     } catch (error: any) {
+        if (error instanceof ValidationError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: error.message
+                },
+                { status: 400 }
+            );
+        }
         console.error("Gagal menambahkan data prestasi:", error);
         return NextResponse.json(
             {

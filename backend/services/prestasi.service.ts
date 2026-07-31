@@ -1,4 +1,5 @@
 import { PrestasiRepository } from "@/repositories/prestasi.repository";
+import { ValidationError } from "@/lib/errors";
 
 export const PrestasiService = {
     /**
@@ -30,19 +31,19 @@ export const PrestasiService = {
     }) {
         // Validasi parameter wajib
         if (!data.atlet_id || !data.event_kejuaraan || !data.tahun || !data.tingkat_lomba || !data.mendali) {
-            throw new Error("Semua field (atlet_id, event_kejuaraan, tahun, tingkat_lomba, mendali) wajib diisi.");
+            throw new ValidationError("Semua field (atlet_id, event_kejuaraan, tahun, tingkat_lomba, mendali) wajib diisi.");
         }
 
         // Validasi enum tingkat_lomba
         const validTingkat = ["Daerah", "Nasional", "Internasional"];
         if (!validTingkat.includes(data.tingkat_lomba)) {
-            throw new Error("tingkat_lomba tidak valid. Harus salah satu dari: Daerah, Nasional, Internasional.");
+            throw new ValidationError("tingkat_lomba tidak valid. Harus salah satu dari: Daerah, Nasional, Internasional.");
         }
 
         // Validasi enum mendali
         const validMendali = ["Emas", "Perak", "Perunggu", "Tanpa Medali"];
         if (!validMendali.includes(data.mendali)) {
-            throw new Error("mendali tidak valid. Harus salah satu dari: Emas, Perak, Perunggu, Tanpa Medali.");
+            throw new ValidationError("mendali tidak valid. Harus salah satu dari: Emas, Perak, Perunggu, Tanpa Medali.");
         }
 
         return await PrestasiRepository.create({
@@ -73,14 +74,14 @@ export const PrestasiService = {
         if (data.tingkat_lomba) {
             const validTingkat = ["Daerah", "Nasional", "Internasional"];
             if (!validTingkat.includes(data.tingkat_lomba)) {
-                throw new Error("tingkat_lomba tidak valid. Harus salah satu dari: Daerah, Nasional, Internasional.");
+                throw new ValidationError("tingkat_lomba tidak valid. Harus salah satu dari: Daerah, Nasional, Internasional.");
             }
         }
 
         if (data.mendali) {
             const validMendali = ["Emas", "Perak", "Perunggu", "Tanpa Medali"];
             if (!validMendali.includes(data.mendali)) {
-                throw new Error("mendali tidak valid. Harus salah satu dari: Emas, Perak, Perunggu, Tanpa Medali.");
+                throw new ValidationError("mendali tidak valid. Harus salah satu dari: Emas, Perak, Perunggu, Tanpa Medali.");
             }
         }
 

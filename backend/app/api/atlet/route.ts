@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AtletService } from "@/services/atlet.service";
+import { ValidationError } from "@/lib/errors";
 
 /**
  * Endpoint GET /api/atlet
@@ -14,22 +15,11 @@ export async function GET(req: Request) {
 
         const data = await AtletService.getAll({ search, kabupaten_kota, cabor_id });
 
-        if (!data || data.length === 0) {
-            return NextResponse.json(
-                {
-                    status: "fail",
-                    message: "tidak menemukan data atlet",
-                    data: []
-                },
-                { status: 404 }
-            );
-        }
-
         return NextResponse.json(
             {
                 status: "success",
-                message: "data berhasil diambil",
-                data: data
+                message: data && data.length > 0 ? "data berhasil diambil" : "tidak menemukan data atlet",
+                data: data ?? []
             },
             { status: 200 }
         );
@@ -65,6 +55,15 @@ export async function POST(req: Request) {
             { status: 201 }
         );
     } catch (error: any) {
+        if (error instanceof ValidationError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: error.message
+                },
+                { status: 400 }
+            );
+        }
         console.error("Gagal menambahkan data atlet:", error);
         return NextResponse.json(
             {

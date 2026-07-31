@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { CaborService } from "@/services/cabor.service";
+import { ValidationError } from "@/lib/errors";
 
 /**
  * Endpoint GET /api/cabor
@@ -12,22 +13,11 @@ export async function GET(req: Request) {
 
         const data = await CaborService.getAll({ search });
 
-        if (!data || data.length === 0) {
-            return NextResponse.json(
-                {
-                    status: "fail",
-                    message: "tidak menemukan data cabor",
-                    data: []
-                },
-                { status: 404 }
-            );
-        }
-
         return NextResponse.json(
             {
                 status: "success",
-                message: "data cabor berhasil diambil",
-                data: data
+                message: data && data.length > 0 ? "data cabor berhasil diambil" : "tidak menemukan data cabor",
+                data: data ?? []
             },
             { status: 200 }
         );
@@ -63,6 +53,15 @@ export async function POST(req: Request) {
             { status: 201 }
         );
     } catch (error: any) {
+        if (error instanceof ValidationError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: error.message
+                },
+                { status: 400 }
+            );
+        }
         console.error("Gagal menambahkan data cabor:", error);
         return NextResponse.json(
             {
