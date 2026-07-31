@@ -1,0 +1,101 @@
+================================================================================
+           ALUR DESAIN INPUT DATA PRESTASI & INTEGRITAS DATA ATLET
+================================================================================
+
+Dokumen ini mendokumentasikan analisis permasalahan, dampak teknis, serta solusi 
+desain alur data (data flow) untuk input prestasi atlet pada sistem KONI.
+
+--------------------------------------------------------------------------------
+1. ANALISIS PERMASALAHAN & BATASAN DATABASE
+--------------------------------------------------------------------------------
+
+Secara relasional, tabel `prestasi` terikat langsung ke tabel `atlet` melalui 
+Foreign Key Constraint:
+   prestasi.atlet_id ---> atlet.id
+
+Artinya:
+   Setiap entri prestasi WAJIB diasosiasikan dengan ID Atlet yang sudah terdaftar 
+   sebelumnya di tabel `atlet`. Sistem database di Supabase akan menolak (HTTP 500/400) 
+   jika Front-End mencoba memasukkan nama atlet berupa teks langsung ke entri prestasi.
+
+--------------------------------------------------------------------------------
+2. DAMPAK BURUK JIKA NAMA ATLET DIINPUT MANUAL DI FORM PRESTASI
+--------------------------------------------------------------------------------
+
+Jika Front-End dirancang agar admin langsung mengetikkan nama atlet secara manual 
+di form prestasi tanpa memisahkannya ke entri atlet terlebih dahulu, maka akan 
+terjadi beberapa masalah/bug serius:
+
+1. Duplikasi Data Atlet (Redundancy):
+   Jika atlet "Ahmad" memiliki 3 prestasi, dan sistem menginputnya secara manual 
+   tiga kali, maka database akan terpaksa membuat 3 baris atlet baru di tabel `atlet`.
+
+2. Kerentanan Typo:
+   Penulisan nama yang sedikit berbeda (misal: "Ahmad" vs "Achmad") akan membuat 
+   database menganggap mereka sebagai 2 atlet berbeda. Riwayat prestasi atlet 
+   tersebut menjadi terpecah dan tidak terkonsolidasi.
+
+3. Ketidakakuratan Statistik Dashboard:
+   Total jumlah atlet (`totalAtlet`) dihitung dari jumlah baris tabel `atlet`. 
+   Duplikasi baris atlet akan menyebabkan angka total atlet di Dashboard melambung 
+   tinggi dan tidak valid.
+
+--------------------------------------------------------------------------------
+3. SOLUSI ALUR DATA: INLINE CREATION (PENDAFTARAN ATLET LANGSUNG DI FORM PRESTASI)
+--------------------------------------------------------------------------------
+
+Untuk memudahkan admin tanpa harus berpindah ke halaman "Master Atlet" terpisah, 
+berikut adalah alur "Inline Creation" yang direkomendasikan untuk diterapkan oleh 
+Front-End:
+
+[Diagram Alur Pembuatan Atlet Secara Inline]
+
+Form Tambah Prestasi
+  ├── Dropdown Atlet (Memuat daftar atlet dari GET /api/atlet)
+  │     ├── Pilih Atlet yang sudah terdaftar (Pilihan utama)
+  │     └── ATAU klik Tombol "+ Tambah Atlet Baru"
+  │
+  └── Jika "+ Tambah Atlet Baru" diklik:
+        ├── Muncul Modal/Pop-up Pendaftaran Atlet Baru
+        ├── Admin mengisi: Nama Atlet, Kabupaten/Kota, Cabor
+        ├── Kirim HTTP POST ke /api/atlet
+        ├── Database Supabase menyimpan data atlet baru & menghasilkan ID baru (atlet_id)
+        ├── Front-End menerima respon sukses berisi data atlet baru beserta ID-nya
+        ├── Modal tertutup secara otomatis
+        └── Dropdown Atlet otomatis terisi & terpilih dengan Atlet Baru tersebut (atlet_id)
+  │
+  └── Admin melanjutkan mengisi data Prestasi (Event, Tahun, Medali, Tingkat)
+  │
+  └── Kirim HTTP POST ke /api/prestasi (mengirimkan atlet_id yang baru dibuat/dipilih)
+
+
+Langkah-Langkah Teknis Alur Data:
+
+Langkah 1 (Front-End - Menampilkan List):
+   - Front-End memanggil `GET /api/atlet` untuk mengisi pilihan dropdown atlet di form prestasi.
+
+Langkah 2 (Front-End - Deteksi Atlet Baru):
+   - Jika atlet belum terdaftar, admin menekan tombol "+ Tambah Atlet Baru" yang 
+     membuka modal input form atlet.
+
+Langkah 3 (Back-End - Registrasi Atlet):
+   - Front-End mengirim `POST /api/atlet` dengan body:
+     { "nama_atlet": "Ahmad", "kabupaten_kota": "Banda Aceh", "cabor_id": 1 }
+   - Backend memvalidasi data dan menyimpannya ke tabel `atlet`.
+   - Backend mengembalikan respon `201 Created` berisi data lengkap atlet baru:
+     { "status": "success", "data": { "id": 99, "nama_atlet": "Ahmad", ... } }
+
+Langkah 4 (Front-End - Sinkronisasi Form):
+   - Front-End menangkap `id: 99`, menutup modal, memasukkan "Ahmad" ke dropdown, 
+     dan men-set nilai dropdown tersebut menjadi `99`.
+
+Langkah 5 (Back-End - Registrasi Prestasi):
+   - Admin mengisi event, medali, dll., lalu mengirim `POST /api/prestasi` dengan body:
+     { "atlet_id": 99, "event_kejuaraan": "PON 2026", "tahun": 2026, "tingkat_lomba": "Nasional", "mendali": "Emas" }
+   - Backend memproses data dan menyimpannya di tabel `prestasi`.
+
+Dengan menggunakan alur ini:
+- Basis data tetap bersih, normal, dan tidak mengalami duplikasi data.
+- Nilai statistik Dashboard tetap akurat dan valid.
+- Admin mendapatkan kemudahan pengisian data seolah-olah dilakukan dalam satu formulir tunggal.
+================================================================================

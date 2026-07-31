@@ -1,7 +1,7 @@
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'mendali_enum') THEN
-        CREATE TYPE mendali_enum AS ENUM ('Emas', 'Perak', 'Perunggu', 'Tanpa Medali');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'medali_enum') THEN
+        CREATE TYPE medali_enum AS ENUM ('Emas', 'Perak', 'Perunggu', 'Tanpa Medali');
     END IF;
 END$$;
 
