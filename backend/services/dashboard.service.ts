@@ -7,31 +7,16 @@ export const DashboardService = {
      */
     async getSummary() {
         // Jalankan seluruh query database secara paralel untuk efisiensi
-        const [totalAtlet, totalCabor, totalPrestasi, totalKepengurusan, medalsByRegion, prestasiDates, activeKepengurusan] = await Promise.all([
+        const [totalAtlet, totalCabor, totalPrestasi, totalKepengurusan, medalsByRegion, activeKepengurusan] = await Promise.all([
             DashboardRepository.countAtlet(),
             DashboardRepository.countCabor(),
             DashboardRepository.countPrestasi(),
             DashboardRepository.countKepengurusan(),
             DashboardRepository.getMedalsByRegion(),
-            DashboardRepository.getPrestasiDates(),
             DashboardRepository.getActiveKepengurusan()
         ]);
 
-        // 1. Hitung Tren Performa Medali Tahunan (Bulanan)
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-        const monthlyMedalTrends = monthNames.map(m => ({ month: m, total: 0 }));
-
-        prestasiDates.forEach((p: any) => {
-            if (p.created_at) {
-                const date = new Date(p.created_at);
-                const monthIndex = date.getMonth();
-                if (monthIndex >= 0 && monthIndex < 12) {
-                    monthlyMedalTrends[monthIndex].total += 1;
-                }
-            }
-        });
-
-        // 2. Hitung Peringatan SK Kedaluwarsa (Early Warning System)
+        // Hitung Peringatan SK Kedaluwarsa (Early Warning System)
         const skWarnings: any[] = [];
         const now = new Date();
 
@@ -74,7 +59,6 @@ export const DashboardService = {
             totalPrestasi,
             totalKepengurusan,
             medalsByRegion,
-            monthlyMedalTrends,
             skWarnings
         };
     }

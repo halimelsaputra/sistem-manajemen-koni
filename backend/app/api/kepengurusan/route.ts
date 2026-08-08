@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { KepengurusanService } from "@/services/kepengurusan.service";
 import { ValidationError } from "@/lib/errors";
+import { parsePagination, toPaginatedData, isPaginatedResult } from "@/lib/pagination";
 
 /**
  * Endpoint GET /api/kepengurusan
@@ -12,14 +13,33 @@ export async function GET(req: Request) {
         const cabor_id = searchParams.get("cabor_id") || undefined;
         const status_kepengurusan = searchParams.get("status_kepengurusan") || undefined;
         const search = searchParams.get("search") || undefined;
+        const pagination = parsePagination(searchParams);
 
-        const data = await KepengurusanService.getAll({ cabor_id, status_kepengurusan, search });
+        const result = await KepengurusanService.getAll(
+            { cabor_id, status_kepengurusan, search },
+            pagination ?? undefined
+        );
 
+        // Mode paginated: { items, pagination: { page, pageSize, total, totalPages } }
+        if (pagination) {
+            const { items, total } = isPaginatedResult(result) ? result : { items: [], total: 0 };
+            return NextResponse.json(
+                {
+                    status: "success",
+                    message: items.length > 0 ? "data kepengurusan berhasil diambil" : "tidak menemukan data kepengurusan",
+                    data: toPaginatedData(items, total, pagination)
+                },
+                { status: 200 }
+            );
+        }
+
+        // Mode non-paginated (backward compatible): array penuh
+        const data = Array.isArray(result) ? result : [];
         return NextResponse.json(
             {
                 status: "success",
                 message: data && data.length > 0 ? "data kepengurusan berhasil diambil" : "tidak menemukan data kepengurusan",
-                data: data ?? []
+                data
             },
             { status: 200 }
         );

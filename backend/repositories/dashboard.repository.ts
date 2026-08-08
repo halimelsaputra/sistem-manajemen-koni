@@ -62,33 +62,42 @@ export const DashboardRepository = {
     },
 
     /**
-     * Mengambil data perolehan medali per wilayah dari Materialized View.
+     * Mengambil data perolehan medali per wilayah dari tabel prestasi dan atlet (dynamic calculation).
      */
     async getMedalsByRegion() {
         const { data, error } = await supabase
-            .from("mv_medals_by_region")
-            .select("*");
+            .from("prestasi")
+            .select("mendali, atlet(kabupaten_kota)");
 
         if (error) {
             console.error("Gagal mengambil data medali per wilayah:", error.message);
             throw error;
         }
-        return data ?? [];
-    },
+        
+        const regions: Record<string, { total_emas: number; total_perak: number; total_perunggu: number }> = {};
 
-    /**
-     * Mengambil tanggal pembuatan seluruh data prestasi untuk kalkulasi tren bulanan.
-     */
-    async getPrestasiDates() {
-        const { data, error } = await supabase
-            .from("prestasi")
-            .select("created_at");
+        (data || []).forEach((row: any) => {
+            // Handle if atlet is object or array (Supabase might return array for joins depending on relation, but usually object for many-to-one)
+            const atletData = Array.isArray(row.atlet) ? row.atlet[0] : row.atlet;
+            const regionName = atletData?.kabupaten_kota;
+            
+            if (regionName) {
+                if (!regions[regionName]) {
+                    regions[regionName] = { total_emas: 0, total_perak: 0, total_perunggu: 0 };
+                }
+                
+                if (row.mendali === 'Emas') regions[regionName].total_emas += 1;
+                else if (row.mendali === 'Perak') regions[regionName].total_perak += 1;
+                else if (row.mendali === 'Perunggu') regions[regionName].total_perunggu += 1;
+            }
+        });
 
-        if (error) {
-            console.error("Gagal mengambil tanggal prestasi:", error.message);
-            throw error;
-        }
-        return data ?? [];
+        return Object.keys(regions).map(key => ({
+            kabupaten_kota: key,
+            total_emas: regions[key].total_emas,
+            total_perak: regions[key].total_perak,
+            total_perunggu: regions[key].total_perunggu
+        }));
     },
 
     /**

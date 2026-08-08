@@ -1,13 +1,18 @@
 import { KepengurusanRepository } from "@/repositories/kepengurusan.repository";
 import { ValidationError } from "@/lib/errors";
+import type { Pagination } from "@/lib/pagination";
 
 export const KepengurusanService = {
     /**
-     * Mendapatkan semua data kepengurusan dengan filter opsional.
+     * Mendapatkan data kepengurusan dengan filter opsional dan pagination opsional.
      * @param filters Objek filter { cabor_id, status_kepengurusan, search }
+     * @param pagination Opsional { page, pageSize } — jika diisi, hasil { items, total }.
      */
-    async getAll(filters?: { cabor_id?: string; status_kepengurusan?: string; search?: string }) {
-        return await KepengurusanRepository.findAll(filters);
+    async getAll(
+        filters?: { cabor_id?: string; status_kepengurusan?: string; search?: string },
+        pagination?: Pagination
+    ) {
+        return await KepengurusanRepository.findAll(filters, pagination);
     },
 
     /**

@@ -1,13 +1,18 @@
 import { AtletRepository } from "@/repositories/atlet.repository";
 import { ValidationError } from "@/lib/errors";
+import type { Pagination } from "@/lib/pagination";
 
 export const AtletService = {
     /**
-     * Mendapatkan semua data atlet dengan filter opsional.
+     * Mendapatkan data atlet dengan filter opsional dan pagination opsional.
      * @param filters Objek filter { search, kabupaten_kota, cabor_id }
+     * @param pagination Opsional { page, pageSize } — jika diisi, hasil { items, total }.
      */
-    async getAll(filters?: { search?: string; kabupaten_kota?: string; cabor_id?: string }) {
-        return await AtletRepository.findAll(filters);
+    async getAll(
+        filters?: { search?: string; kabupaten_kota?: string; cabor_id?: string },
+        pagination?: Pagination
+    ) {
+        return await AtletRepository.findAll(filters, pagination);
     },
 
     /**

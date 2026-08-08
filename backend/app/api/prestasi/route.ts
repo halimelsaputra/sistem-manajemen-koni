@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PrestasiService } from "@/services/prestasi.service";
 import { ValidationError } from "@/lib/errors";
+import { parsePagination, toPaginatedData, isPaginatedResult } from "@/lib/pagination";
 
 /**
  * Endpoint GET /api/prestasi
@@ -13,15 +14,36 @@ export async function GET(req: Request) {
         const tingkat_lomba = searchParams.get("tingkat_lomba") || undefined;
         const mendali = searchParams.get("mendali") || undefined;
         const tanggal = searchParams.get("tanggal") || undefined;
+        const cabor_id = searchParams.get("cabor_id") || undefined;
+        const kabupaten_kota = searchParams.get("kabupaten_kota") || undefined;
         const search = searchParams.get("search") || undefined;
+        const pagination = parsePagination(searchParams);
 
-        const data = await PrestasiService.getAll({ atlet_id, tingkat_lomba, mendali, tanggal, search });
+        const result = await PrestasiService.getAll(
+            { atlet_id, tingkat_lomba, mendali, tanggal, cabor_id, kabupaten_kota, search },
+            pagination ?? undefined
+        );
 
+        // Mode paginated: { items, pagination: { page, pageSize, total, totalPages } }
+        if (pagination) {
+            const { items, total } = isPaginatedResult(result) ? result : { items: [], total: 0 };
+            return NextResponse.json(
+                {
+                    status: "success",
+                    message: items.length > 0 ? "data prestasi berhasil diambil" : "tidak menemukan data prestasi",
+                    data: toPaginatedData(items, total, pagination)
+                },
+                { status: 200 }
+            );
+        }
+
+        // Mode non-paginated (backward compatible): array penuh
+        const data = Array.isArray(result) ? result : [];
         return NextResponse.json(
             {
                 status: "success",
                 message: data && data.length > 0 ? "data prestasi berhasil diambil" : "tidak menemukan data prestasi",
-                data: data ?? []
+                data
             },
             { status: 200 }
         );

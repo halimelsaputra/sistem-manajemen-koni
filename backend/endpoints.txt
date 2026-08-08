@@ -127,7 +127,7 @@ Catatan Umum:
     - atlet_id (number): Filter berdasarkan ID atlet tertentu.
     - tingkat_lomba (string): Filter tingkat kompetisi ("Daerah" | "Nasional" | "Internasional").
     - mendali (string): Filter jenis medali ("Emas" | "Perak" | "Perunggu" | "Tanpa Medali").
-    - tahun (number): Filter berdasarkan tahun perolehan.
+    - tanggal (string): Filter berdasarkan tanggal perolehan (format: YYYY-MM-DD).
     - search (string): Pencarian berdasarkan nama event kejuaraan ("event_kejuaraan", case-insensitive).
 
 * POST /api/prestasi
@@ -136,7 +136,7 @@ Catatan Umum:
     {
       "atlet_id": number (wajib),
       "event_kejuaraan": "string" (wajib),
-      "tahun": number (wajib),
+      "tanggal": "string" (wajib, format: YYYY-MM-DD),
       "tingkat_lomba": "string" (wajib, nilai: "Daerah" | "Nasional" | "Internasional"),
       "mendali": "string" (wajib, nilai: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali")
     }
@@ -150,7 +150,7 @@ Catatan Umum:
     {
       "atlet_id": number,
       "event_kejuaraan": "string",
-      "tahun": number,
+      "tanggal": "string",
       "tingkat_lomba": "string",
       "mendali": "string"
     }

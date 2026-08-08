@@ -21,6 +21,20 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const pathname = usePathname()
 
+  if (pathname === '/login') {
+    return <>{children}</>;
+  }
+
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div
       className="min-h-screen w-full"
@@ -115,6 +129,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.label}
                     href={item.href}
+                    onClick={item.label === 'Keluar' ? handleLogout : undefined}
                     className={cn(
                       'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200',
                     )}

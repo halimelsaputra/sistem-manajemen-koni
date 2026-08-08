@@ -64,7 +64,7 @@ Database PostgreSQL di Supabase memiliki 4 tabel utama dan 1 Materialized View:
    | id (PK)          |          +------------------------+
    | atlet_id (FK)    |          | kabupaten_kota (Unique)|
    | event_kejuaraan  |          | total_emas             |
-   | tahun            |          | total_perak            |
+   | tanggal          |          | total_perak            |
    | tingkat_lomba    |          | total_perunggu         |
    | mendali          |          +------------------------+
    +------------------+

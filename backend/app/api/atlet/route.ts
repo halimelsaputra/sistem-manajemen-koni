@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AtletService } from "@/services/atlet.service";
 import { ValidationError } from "@/lib/errors";
+import { parsePagination, toPaginatedData, isPaginatedResult } from "@/lib/pagination";
 
 /**
  * Endpoint GET /api/atlet
@@ -12,14 +13,30 @@ export async function GET(req: Request) {
         const search = searchParams.get("search") || undefined;
         const kabupaten_kota = searchParams.get("kabupaten_kota") || undefined;
         const cabor_id = searchParams.get("cabor_id") || undefined;
+        const pagination = parsePagination(searchParams);
 
-        const data = await AtletService.getAll({ search, kabupaten_kota, cabor_id });
+        const result = await AtletService.getAll({ search, kabupaten_kota, cabor_id }, pagination ?? undefined);
 
+        // Mode paginated: { items, pagination: { page, pageSize, total, totalPages } }
+        if (pagination) {
+            const { items, total } = isPaginatedResult(result) ? result : { items: [], total: 0 };
+            return NextResponse.json(
+                {
+                    status: "success",
+                    message: items.length > 0 ? "data berhasil diambil" : "tidak menemukan data atlet",
+                    data: toPaginatedData(items, total, pagination)
+                },
+                { status: 200 }
+            );
+        }
+
+        // Mode non-paginated (backward compatible): array penuh
+        const data = Array.isArray(result) ? result : [];
         return NextResponse.json(
             {
                 status: "success",
                 message: data && data.length > 0 ? "data berhasil diambil" : "tidak menemukan data atlet",
-                data: data ?? []
+                data
             },
             { status: 200 }
         );

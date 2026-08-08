@@ -91,7 +91,7 @@ Langkah 4 (Front-End - Sinkronisasi Form):
 
 Langkah 5 (Back-End - Registrasi Prestasi):
    - Admin mengisi event, medali, dll., lalu mengirim `POST /api/prestasi` dengan body:
-     { "atlet_id": 99, "event_kejuaraan": "PON 2026", "tahun": 2026, "tingkat_lomba": "Nasional", "mendali": "Emas" }
+     { "atlet_id": 99, "event_kejuaraan": "PON 2026", "tanggal": "2026-01-01", "tingkat_lomba": "Nasional", "mendali": "Emas" }
    - Backend memproses data dan menyimpannya di tabel `prestasi`.
 
 Dengan menggunakan alur ini:

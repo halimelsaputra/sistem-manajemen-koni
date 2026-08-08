@@ -1,14 +1,21 @@
 import { supabase } from "@/lib/supabase";
+import type { Pagination } from "@/lib/pagination";
 
 export const AtletRepository = {
     /**
-     * Mengambil semua data atlet beserta nama cabang olahraga (cabor) yang diikuti, dengan filter opsional.
+     * Mengambil data atlet beserta nama cabang olahraga (cabor) yang diikuti, dengan filter opsional.
+     * Saat `pagination` diberikan, mengembalikan { items, total }.
      * @param filters Objek filter { search, kabupaten_kota, cabor_id }
+     * @param pagination Opsional { page, pageSize } — jika diisi, hasil dipotong per halaman.
      */
-    async findAll(filters?: { search?: string; kabupaten_kota?: string; cabor_id?: string }) {
-        let query = supabase
-            .from("atlet")
-            .select("*, cabor(nama_cabor)");
+    async findAll(
+        filters?: { search?: string; kabupaten_kota?: string; cabor_id?: string },
+        pagination?: Pagination
+    ) {
+        const selectStr = "*, cabor(nama_cabor)";
+        let query = pagination
+            ? supabase.from("atlet").select(selectStr, { count: "exact" })
+            : supabase.from("atlet").select(selectStr);
 
         if (filters?.cabor_id) {
             query = query.eq("cabor_id", filters.cabor_id);
@@ -20,11 +27,23 @@ export const AtletRepository = {
             query = query.ilike("nama_atlet", `%${filters.search}%`);
         }
 
-        const { data, error } = await query;
-        
+        // ORDER BY eksplisit agar urutan halaman stabil antar request
+        query = query.order("id", { ascending: true });
+
+        if (pagination) {
+            const from = (pagination.page - 1) * pagination.pageSize;
+            query = query.range(from, from + pagination.pageSize - 1);
+        }
+
+        const { data, count, error } = await query;
+
         if (error) {
             console.error("Gagal mengambil data atlet dari database:", error.message);
             throw error;
+        }
+
+        if (pagination) {
+            return { items: data ?? [], total: count ?? 0 };
         }
         return data;
     },

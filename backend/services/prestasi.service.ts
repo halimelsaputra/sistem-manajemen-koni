@@ -1,13 +1,26 @@
 import { PrestasiRepository } from "@/repositories/prestasi.repository";
 import { ValidationError } from "@/lib/errors";
+import type { Pagination } from "@/lib/pagination";
 
 export const PrestasiService = {
     /**
-     * Mendapatkan semua data prestasi dengan filter opsional.
-     * @param filters Objek filter { atlet_id, tingkat_lomba, mendali, tanggal, search }
+     * Mendapatkan data prestasi dengan filter opsional dan pagination opsional.
+     * @param filters Objek filter { atlet_id, tingkat_lomba, mendali, tanggal, cabor_id, kabupaten_kota, search }
+     * @param pagination Opsional { page, pageSize } — jika diisi, hasil { items, total }.
      */
-    async getAll(filters?: { atlet_id?: string; tingkat_lomba?: string; mendali?: string; tanggal?: string; search?: string }) {
-        return await PrestasiRepository.findAll(filters);
+    async getAll(
+        filters?: {
+            atlet_id?: string;
+            tingkat_lomba?: string;
+            mendali?: string;
+            tanggal?: string;
+            cabor_id?: string;
+            kabupaten_kota?: string;
+            search?: string;
+        },
+        pagination?: Pagination
+    ) {
+        return await PrestasiRepository.findAll(filters, pagination);
     },
 
     /**

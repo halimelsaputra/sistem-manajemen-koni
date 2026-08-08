@@ -21,8 +21,7 @@ import { Line } from 'react-chartjs-2';
 import DashboardStatCard from '@/components/DashboardStatCard';
 import { Card } from '@/components/ui/card';
 import { ExpandableCard } from '@/components/ui/expandable-card';
-import StatDetailPanel from '@/components/StatDetailPanel';
-import { MOCK_REGIONS, RegionMedal, MOCK_DASHBOARD_LINE_TREND } from '@/data/mockData';
+import { MOCK_REGIONS, RegionMedal } from '@/data/mockData';
 
 const AcehMap = dynamic(() => import('@/components/AcehMap'), { 
   ssr: false,
@@ -51,73 +50,154 @@ interface DashboardData {
   totalPrestasi: number;
   totalKepengurusan: number;
   medalsByRegion: { kabupaten_kota: string; total_emas: number; total_perak: number; total_perunggu: number }[];
+  skWarnings: { id: number; cabor: string; nomor_sk: string; tanggal_sk: string; masa_bakti: string; expiry_date: string; days_remaining: number; is_expired: boolean }[];
 }
 
 interface ExpiringSK {
   id: number;
   cabor: string;
   nomor_sk: string;
-  days_to_expire: number;
+  days_remaining: number;
 }
 
 export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [activeRegion, setActiveRegion] = useState<RegionMedal | null>(null);
-  const [activeStatCard, setActiveStatCard] = useState<string | null>(null);
   const [expiringSK, setExpiringSK] = useState<ExpiringSK[]>([]);
+  const [prestasiList, setPrestasiList] = useState<any[]>([]);
+
+  const [timeFilter, setTimeFilter] = useState<'1BLN' | '3BLN' | '1TH' | '3TH' | 'Maks'>('Maks');
 
   useEffect(() => {
-    // Fetch Dashboard stats
+    // Fetch Dashboard stats (skWarnings dihitung server-side untuk Early Warning System)
     fetch('/api/dashboard')
       .then(res => res.json())
       .then(data => {
-        setDashboardData(data.data || data);
-      })
-      .catch(console.error);
+        const d = data.data || data;
+        setDashboardData(d);
 
-    // Fetch Kepengurusan to calculate EWS
-    fetch('/api/kepengurusan')
-      .then(res => res.json())
-      .then(async (data) => {
-        const arr = Array.isArray(data) ? data : data.data || [];
-        
-        // Also need cabor to map cabor_id to cabor string
-        const caborRes = await fetch('/api/cabor');
-        const caborData = await caborRes.json();
-        const caborList = Array.isArray(caborData) ? caborData : caborData.data || [];
+        // EWS: pakai skWarnings dari /api/dashboard (single source of truth)
+        const skWarnings: any[] = Array.isArray(d.skWarnings) ? d.skWarnings : [];
+        const expiring: ExpiringSK[] = skWarnings
+          .filter((w: any) => !w.is_expired && w.days_remaining >= 0 && w.days_remaining <= 90)
+          .map((w: any) => ({
+            id: w.id,
+            cabor: w.cabor || 'Unknown Cabor',
+            nomor_sk: w.nomor_sk,
+            days_remaining: w.days_remaining,
+          }))
+          .sort((a, b) => a.days_remaining - b.days_remaining);
 
-        const today = new Date();
-        const expiring: ExpiringSK[] = [];
-
-        arr.forEach((sk: any) => {
-          if (sk.status_kepengurusan === 'Aktif') {
-            const masaBakti = sk.masa_bakti || '';
-            const endYearStr = masaBakti.split('-')[1];
-            if (endYearStr) {
-              const endYear = parseInt(endYearStr);
-              const endDate = new Date(endYear, 11, 31); // Dec 31 of end year
-              const diffTime = endDate.getTime() - today.getTime();
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              
-              if (diffDays <= 90 && diffDays >= 0) {
-                 const caborObj = caborList.find((c: any) => c.id === sk.cabor_id);
-                 expiring.push({
-                    id: sk.id,
-                    cabor: caborObj ? caborObj.nama_cabor : 'Unknown Cabor',
-                    nomor_sk: sk.nomor_sk,
-                    days_to_expire: diffDays
-                 });
-              }
-            }
-          }
-        });
-
-        // sort by days_to_expire asc
-        expiring.sort((a, b) => a.days_to_expire - b.days_to_expire);
         setExpiringSK(expiring);
       })
       .catch(console.error);
+
+    // Fetch Prestasi untuk menghitung Tren Medali Tahunan
+    fetch('/api/prestasi')
+      .then(res => res.json())
+      .then(data => {
+        const arr = Array.isArray(data) ? data : data.data || [];
+        setPrestasiList(arr);
+      })
+      .catch(console.error);
+
   }, []);
+
+  const trendData = useMemo(() => {
+    const emasPrestasi = prestasiList.filter((p: any) => p.mendali === 'Emas');
+    const today = new Date();
+    const currYear = today.getFullYear();
+    const currMonth = today.getMonth(); // 0-11
+
+    // Tanggal event prestasi (kolom `tanggal`), fallback ke created_at / awal tahun berjalan
+    const eventDate = (p: any): Date => {
+       if (p.tanggal) {
+          const d = new Date(p.tanggal);
+          if (!isNaN(d.getTime())) return d;
+       }
+       if (p.created_at) {
+          const d = new Date(p.created_at);
+          if (!isNaN(d.getTime())) return d;
+       }
+       return new Date(currYear, 0, 1);
+    };
+
+    if (timeFilter === '1BLN') {
+       // Tampilkan 4 minggu terakhir
+       const labels = ['Minggu 1', 'Minggu 2', 'Minggu 3', 'Minggu 4'];
+       const counts = [0, 0, 0, 0];
+       
+       emasPrestasi.forEach((p: any) => {
+          const d = eventDate(p);
+          if (d.getFullYear() === currYear && d.getMonth() === currMonth) {
+             const week = Math.min(Math.floor(d.getDate() / 8), 3);
+             counts[week]++;
+          }
+       });
+       return { labels, data: counts };
+    } 
+    else if (timeFilter === '3BLN') {
+       // Tampilkan 3 bulan terakhir
+       const labels = [];
+       const counts = [0, 0, 0];
+       for (let i = 2; i >= 0; i--) {
+          const d = new Date(currYear, currMonth - i, 1);
+          labels.push(d.toLocaleString('id-ID', { month: 'short' }));
+       }
+       emasPrestasi.forEach((p: any) => {
+          const d = eventDate(p);
+          const monthDiff = (currYear - d.getFullYear()) * 12 + (currMonth - d.getMonth());
+          if (monthDiff >= 0 && monthDiff < 3) counts[2 - monthDiff]++;
+       });
+       return { labels, data: counts };
+    }
+    else if (timeFilter === '1TH') {
+       // Tampilkan 12 bulan di tahun ini
+       const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+       const counts = Array(12).fill(0);
+       emasPrestasi.forEach((p: any) => {
+          const d = eventDate(p);
+          if (d.getFullYear() === currYear) counts[d.getMonth()]++;
+       });
+       return { labels, data: counts };
+    }
+    else if (timeFilter === '3TH') {
+       // Tampilkan 3 tahun terakhir
+       const labels = [String(currYear - 2), String(currYear - 1), String(currYear)];
+       const counts = [0, 0, 0];
+       emasPrestasi.forEach((p: any) => {
+          const y = eventDate(p).getFullYear();
+          if (y === currYear - 2) counts[0]++;
+          else if (y === currYear - 1) counts[1]++;
+          else if (y === currYear) counts[2]++;
+       });
+       return { labels, data: counts };
+    }
+    else {
+       // Maks: Tampilkan semua tahun yang ada
+       const yearCounts: Record<string, number> = {};
+       emasPrestasi.forEach((p: any) => {
+          const y = String(eventDate(p).getFullYear());
+          yearCounts[y] = (yearCounts[y] || 0) + 1;
+       });
+       let years = Object.keys(yearCounts).sort();
+       
+       if (years.length > 0) {
+           const minYear = parseInt(years[0]);
+           const maxYear = parseInt(years[years.length - 1]);
+           const continuousYears = [];
+           for (let i = minYear; i <= maxYear; i++) continuousYears.push(i.toString());
+           years = continuousYears;
+       }
+       if (years.length === 0) years = [String(currYear - 1), String(currYear)]; // minimal 2 titik agar grafik garis tergambar
+       if (years.length === 1) years = [String(parseInt(years[0]) - 1), years[0]];
+
+       return {
+          labels: years,
+          data: years.map(y => yearCounts[y] || 0)
+       };
+    }
+  }, [prestasiList, timeFilter]);
 
   const handleSelectRegion = (region: RegionMedal) => {
     setActiveRegion(prev => prev?.id === region.id ? null : region);
@@ -147,8 +227,6 @@ export default function DashboardPage() {
       if (updated && (updated.total_emas !== activeRegion.total_emas || updated.total_perak !== activeRegion.total_perak)) {
          setActiveRegion(updated);
       }
-    } else if (!activeRegion && dashboardData) {
-      setActiveRegion(mappedRegions[0]);
     }
   }, [dashboardData, mappedRegions, activeRegion]);
 
@@ -160,7 +238,6 @@ export default function DashboardPage() {
       id: 'atlet',
       value: dashboardData?.totalAtlet || 0,
       title: 'Total Atlet Terdaftar',
-      increase: 'Live Data',
       delay: '0ms',
       variant: 'default' as const,
     },
@@ -168,7 +245,6 @@ export default function DashboardPage() {
       id: 'cabor',
       value: dashboardData?.totalCabor || 0,
       title: 'Total Cabang Olahraga',
-      increase: 'Live Data',
       delay: '100ms',
       variant: 'default' as const,
     },
@@ -176,7 +252,6 @@ export default function DashboardPage() {
       id: 'prestasi',
       value: dashboardData?.totalPrestasi || 0,
       title: 'Total Prestasi',
-      increase: 'Live Data',
       delay: '200ms',
       variant: 'default' as const,
     },
@@ -184,25 +259,17 @@ export default function DashboardPage() {
       id: 'emas',
       value: totalEmas,
       title: 'Total Medali Emas Regional',
-      increase: 'Live Data',
       delay: '300ms',
       variant: 'default' as const,
     },
   ];
 
-  const statDetailData = {
-    atlet: [], 
-    cabor: [],
-    prestasi: [],
-    emas: mappedRegions.map(r => ({ label: r.kabupaten_kota, highlight: `${r.total_emas} emas` })),
-  };
-
   const lineChartData = {
-    labels: MOCK_DASHBOARD_LINE_TREND.labels,
+    labels: trendData.labels,
     datasets: [
       {
         label: 'Medali Emas',
-        data: MOCK_DASHBOARD_LINE_TREND.medal_emas,
+        data: trendData.data,
         borderColor: '#dc2626',
         backgroundColor: 'rgba(220, 38, 38, 0.06)',
         fill: true,
@@ -246,26 +313,11 @@ export default function DashboardPage() {
             key={card.id}
             value={card.value}
             title={card.title}
-            increase={card.increase}
             delay={card.delay}
             variant={card.variant}
-            isActive={activeStatCard === card.id}
-            onClick={() => {
-               if (card.id === 'emas') setActiveStatCard(prev => prev === card.id ? null : card.id);
-            }}
           />
         ))}
       </div>
-
-      {/* Detail Modal */}
-      {activeStatCard && (
-        <StatDetailPanel
-          title={statCards.find(c => c.id === activeStatCard)?.title ?? ''}
-          value={Number(statCards.find(c => c.id === activeStatCard)?.value ?? 0)}
-          items={statDetailData[activeStatCard as keyof typeof statDetailData]}
-          onClose={() => setActiveStatCard(null)}
-        />
-      )}
 
       {/* Peta */}
       <Card className="relative overflow-hidden h-[650px] lg:h-[720px] animate-slide-in-up">
@@ -348,7 +400,20 @@ export default function DashboardPage() {
 
       {/* Tren Performa Medali Tahunan */}
       <Card className="p-5">
-        <h2 className="text-base font-bold text-gray-900 mb-4">Tren Performa Medali Tahunan</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-gray-900">Tren Performa Medali Tahunan</h2>
+          <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg">
+            {['1BLN', '3BLN', '1TH', '3TH', 'Maks'].map(filter => (
+              <button
+                key={filter}
+                onClick={() => setTimeFilter(filter as any)}
+                className={`px-3 py-1 text-xs font-bold rounded-md transition ${timeFilter === filter ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="h-[220px] w-full">
           <Line data={lineChartData} options={lineChartOptions} />
         </div>
@@ -367,7 +432,7 @@ export default function DashboardPage() {
         {expiringSK.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {expiringSK.map((item) => {
-              const isUrgent = item.days_to_expire <= 14;
+              const isUrgent = item.days_remaining <= 14;
               return (
                 <div
                   key={item.id}
@@ -378,7 +443,7 @@ export default function DashboardPage() {
                   }`}
                 >
                   <div className="font-bold text-xs text-[#dc2626]">{item.cabor}</div>
-                  <div className="text-[11px] text-gray-600 mt-0.5">Kedaluwarsa dalam {item.days_to_expire} hari.</div>
+                  <div className="text-[11px] text-gray-600 mt-0.5">Kedaluwarsa dalam {item.days_remaining} hari.</div>
                   <div className="text-[10px] text-gray-500 mt-0.5">Nomor SK: {item.nomor_sk}</div>
                 </div>
               );

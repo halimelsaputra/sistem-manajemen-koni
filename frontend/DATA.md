@@ -54,7 +54,7 @@ Dua data utama yang dikelola admin:
 | `atlet_id` | INT FK → atlet | |
 | `cabor_id` | INT FK → cabor | |
 | `nama_event` | VARCHAR(200) | PORA XIV, PON XXI |
-| `tahun` | INT | Tahun kejuaraan |
+| `tanggal` | DATE | Tanggal kejuaraan (format YYYY-MM-DD, seperti `tanggal_sk`) |
 | `tingkat` | VARCHAR(20) | Provinsi / Nasional / Internasional |
 | `medali` | VARCHAR(20) | Emas / Perak / Perunggu / Tanpa Medali |
 | `metadata_dinamis` | JSONB DEFAULT '{}' | Skor dinamis per cabor |
@@ -103,7 +103,7 @@ wilayah 1──→ N atlet 1──→ N prestasi N←──1 cabor 1──→ N 
 |-----|-------|
 | Total Atlet | `SELECT COUNT(DISTINCT atlet_id) FROM prestasi` |
 | Total Cabor | `SELECT COUNT(DISTINCT cabor_id) FROM prestasi` |
-| Total Event | `SELECT COUNT(DISTINCT nama_event \|\| tahun) FROM prestasi` |
+| Total Event | `SELECT COUNT(DISTINCT nama_event \|\| tanggal) FROM prestasi` |
 | Emas per Wilayah | JOIN prestasi → atlet → wilayah, WHERE medali='Emas', GROUP BY wilayah |
 | EWS SK | `masa_bakti_selesai - EXTRACT(YEAR FROM NOW()) <= 1` |
 

@@ -17,7 +17,32 @@ Berikut adalah status kesiapan seluruh endpoint untuk digunakan oleh Front-End:
 *   **Modul Cabor:** `GET /api/cabor`, `POST /api/cabor`, `GET /api/cabor/[id]`, `PUT /api/cabor/[id]`, `DELETE /api/cabor/[id]`
 *   **Modul Kepengurusan:** `GET /api/kepengurusan`, `POST /api/kepengurusan`, `GET /api/kepengurusan/[id]`, `PUT /api/kepengurusan/[id]`, `DELETE /api/kepengurusan/[id]`
 *   **Modul Prestasi:** `GET /api/prestasi`, `POST /api/prestasi`, `GET /api/prestasi/[id]`, `PUT /api/prestasi/[id]`, `DELETE /api/prestasi/[id]`
-*   **Modul Dashboard:** `GET /api/dashboard` (Mendukung data dasar, sebaran peta medali per wilayah, data tren tahunan bulanan, dan peringatan kedaluwarsa SK kepengurusan).
+*   **Modul Dashboard:** `GET /api/dashboard` (Mendukung data dasar, sebaran peta medali per wilayah, dan peringatan kedaluwarsa SK kepengurusan).
+
+---
+
+## Konvensi Pagination (Semua List Endpoint)
+
+Seluruh list endpoint (`GET /api/atlet`, `GET /api/cabor`, `GET /api/kepengurusan`, `GET /api/prestasi`) mendukung pagination server-side:
+
+*   **Query Parameters (Opsional):**
+    *   `page` (number): Nomor halaman, dimulai dari 1 (default: `1`).
+    *   `pageSize` (number): Jumlah data per halaman (default: `20`, maksimum: `100`).
+*   **Perilaku:**
+    *   Jika **`page` atau `pageSize` diberikan**, response `data` berbentuk objek:
+        ```json
+        {
+          "items": [ ... ],
+          "pagination": {
+            "page": 1,
+            "pageSize": 20,
+            "total": 352,
+            "totalPages": 18
+          }
+        }
+        ```
+    *   Jika **keduanya tidak diberikan**, endpoint mengembalikan **seluruh data sebagai array** (mode kompatibilitas) — dipakai untuk kebutuhan yang memang butuh semua data, misalnya dropdown atlet/cabor dan grafik tren dashboard.
+*   **Filter server-side:** seluruh filter pada endpoint berlaku di **seluruh dataset** (bukan hanya halaman aktif), karena diterapkan di query database sebelum pagination.
 
 ---
 
@@ -26,7 +51,7 @@ Berikut adalah status kesiapan seluruh endpoint untuk digunakan oleh Front-End:
 Endpoint ini menyuplai data statistik untuk halaman utama Dashboard.
 
 ### `GET /api/dashboard` `[FIKS]`
-Mengambil data ringkasan statistik, data persebaran medali wilayah, tren tahunan, dan peringatan kedaluwarsa SK.
+Mengambil data ringkasan statistik, data persebaran medali wilayah, dan peringatan kedaluwarsa SK.
 
 *   **Status Kode RMM Level 2:** `200 OK` (Sukses), `500 Internal Server Error` (Gagal).
 *   **Response Headers:** `Content-Type: application/json`
@@ -49,20 +74,6 @@ Mengambil data ringkasan statistik, data persebaran medali wilayah, tren tahunan
         "total_perunggu": 15
       }
     ],
-    "monthlyMedalTrends": [
-      { "month": "Jan", "total": 12 },
-      { "month": "Feb", "total": 19 },
-      { "month": "Mar", "total": 3 },
-      { "month": "Apr", "total": 5 },
-      { "month": "Mei", "total": 2 },
-      { "month": "Jun", "total": 3 },
-      { "month": "Jul", "total": 11 },
-      { "month": "Agu", "total": 0 },
-      { "month": "Sep", "total": 0 },
-      { "month": "Okt", "total": 0 },
-      { "month": "Nov", "total": 0 },
-      { "month": "Des", "total": 0 }
-    ],
     "skWarnings": [
       {
         "id": 1,
@@ -82,7 +93,6 @@ Mengambil data ringkasan statistik, data persebaran medali wilayah, tren tahunan
 #### Catatan Kesesuaian Desain UI Dashboard:
 *   **Total Medali Emas Regional (UI: 352)**: Front-End dapat menghitung total medali emas dengan menjumlahkan seluruh atribut `total_emas` di dalam array `medalsByRegion`.
 *   **Peta Wilayah & Medali (UI: Persebaran 23 Wilayah)**: Array `medalsByRegion` berisi daftar perolehan medali untuk 23 kabupaten/kota di Aceh yang dapat langsung diplot di peta.
-*   **Tren Performa Medali Tahunan (UI Chart)**: Properti `monthlyMedalTrends` menyuplai grafik tren tahunan (jumlah prestasi per bulan untuk visualisasi garis grafik PON/Kejuaraan).
 *   **Early Warning System SK Kedaluwarsa (UI Warning)**: Properti `skWarnings` menyuplai daftar SK aktif kepengurusan cabor yang telah kedaluwarsa atau segera kedaluwarsa dalam waktu kurang dari 3 bulan (90 hari).
 
 ---
@@ -209,6 +219,8 @@ Mendapatkan daftar atlet dengan pencarian dan filter.
     *   `search` (string): Pencarian nama atlet (sebagian nama, case-insensitive).
     *   `kabupaten_kota` (string): Menyaring asal wilayah atlet secara presisi.
     *   `cabor_id` (number): Menyaring berdasarkan cabang olahraga.
+    *   `page` (number): Nomor halaman (default: `1`).
+    *   `pageSize` (number): Data per halaman (default: `20`, maks: `100`).
 *   **Status Kode RMM Level 2:** `200 OK`, `404 Not Found` (Atlet kosong), `500 Internal Server Error`.
 
 #### Response Sukses (`200 OK`)
@@ -340,7 +352,9 @@ Mengambil daftar riwayat kepengurusan cabor (menyuplai tabel **Arsip Histori Kep
 *   **Query Parameters (Opsional):**
     *   `cabor_id` (number): Menyaring kepengurusan berdasarkan cabang olahraga.
     *   `status_kepengurusan` (string): `"Aktif"` atau `"Berakhir"`.
-    *   `search` (string): Pencarian nama ketua_umum, ketua_harian, sekretaris, atau nomor_sk.
+    *   `search` (string): Pencarian nama cabor, ketua_umum, ketua_harian, sekretaris, atau nomor_sk.
+    *   `page` (number): Nomor halaman (default: `1`).
+    *   `pageSize` (number): Data per halaman (default: `20`, maks: `100`).
 *   **Status Kode RMM Level 2:** `200 OK`, `404 Not Found`, `500 Internal Server Error`.
 
 #### Response Sukses (`200 OK`)
@@ -466,8 +480,12 @@ Mengambil daftar prestasi beserta informasi atlet dan cabornya.
     *   `atlet_id` (number): Menyaring prestasi atlet tertentu.
     *   `tingkat_lomba` (string): `"Daerah"`, `"Nasional"`, atau `"Internasional"`.
     *   `mendali` (string): `"Emas"`, `"Perak"`, `"Perunggu"`, atau `"Tanpa Medali"`.
-    *   `tahun` (number): Menyaring tahun perolehan prestasi.
-    *   `search` (string): Pencarian nama event kejuaraan (`event_kejuaraan`).
+    *   `tanggal` (string): Menyaring tanggal perolehan prestasi (format `YYYY-MM-DD`).
+    *   `cabor_id` (number): Menyaring berdasarkan cabang olahraga atlet (filter relasi `atlet.cabor_id`).
+    *   `kabupaten_kota` (string): Menyaring berdasarkan asal daerah atlet (filter relasi `atlet.kabupaten_kota`).
+    *   `search` (string): Pencarian nama event kejuaraan (`event_kejuaraan`) **atau** nama atlet (`atlet.nama_atlet`).
+    *   `page` (number): Nomor halaman (default: `1`).
+    *   `pageSize` (number): Data per halaman (default: `20`, maks: `100`).
 *   **Status Kode RMM Level 2:** `200 OK`, `404 Not Found`, `500 Internal Server Error`.
 
 #### Response Sukses (`200 OK`)
@@ -480,7 +498,7 @@ Mengambil daftar prestasi beserta informasi atlet dan cabornya.
       "id": 1,
       "atlet_id": 10,
       "event_kejuaraan": "Pekan Olahraga Nasional (PON) XXI",
-      "tahun": 2024,
+      "tanggal": "2024-01-15",
       "tingkat_lomba": "Nasional",
       "mendali": "Emas",
       "created_at": "2026-07-28T09:39:14.000Z",
@@ -506,7 +524,7 @@ Menambahkan prestasi baru untuk atlet (UI: **+ Tambah Prestasi**).
     {
       "atlet_id": 10,
       "event_kejuaraan": "PON XXI 2024",
-      "tahun": 2024,
+      "tanggal": "2024-01-15",
       "tingkat_lomba": "Nasional",
       "mendali": "Emas"
     }
@@ -522,7 +540,7 @@ Menambahkan prestasi baru untuk atlet (UI: **+ Tambah Prestasi**).
     "id": 2,
     "atlet_id": 10,
     "event_kejuaraan": "PON XXI 2024",
-    "tahun": 2024,
+    "tanggal": "2024-01-15",
     "tingkat_lomba": "Nasional",
     "mendali": "Emas",
     "created_at": "2026-07-30T15:19:32.000Z",
@@ -552,7 +570,7 @@ Mengambil detail data prestasi.
     "id": 1,
     "atlet_id": 10,
     "event_kejuaraan": "Pekan Olahraga Nasional (PON) XXI",
-    "tahun": 2024,
+    "tanggal": "2024-01-15",
     "tingkat_lomba": "Nasional",
     "mendali": "Emas",
     "created_at": "2026-07-28T09:39:14.000Z",
@@ -588,7 +606,7 @@ Memperbarui data prestasi.
     "id": 1,
     "atlet_id": 10,
     "event_kejuaraan": "Pekan Olahraga Nasional (PON) XXI",
-    "tahun": 2024,
+    "tanggal": "2024-01-15",
     "tingkat_lomba": "Nasional",
     "mendali": "Perak",
     "created_at": "2026-07-28T09:39:14.000Z",

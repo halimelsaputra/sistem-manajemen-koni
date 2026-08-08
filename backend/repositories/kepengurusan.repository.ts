@@ -1,14 +1,23 @@
 import { supabase } from "@/lib/supabase";
+import type { Pagination } from "@/lib/pagination";
 
 export const KepengurusanRepository = {
     /**
-     * Mengambil semua data kepengurusan beserta nama cabang olahraga (cabor) dengan filter opsional.
+     * Mengambil data kepengurusan beserta nama cabang olahraga (cabor) dengan filter opsional.
+     * Saat `pagination` diberikan, mengembalikan { items, total }.
      * @param filters Objek filter { cabor_id, status_kepengurusan, search }
+     * @param pagination Opsional { page, pageSize } — jika diisi, hasil dipotong per halaman.
      */
-    async findAll(filters?: { cabor_id?: string; status_kepengurusan?: string; search?: string }) {
-        let query = supabase
-            .from("kepengurusan")
-            .select("*, cabor(nama_cabor)");
+    async findAll(
+        filters?: { cabor_id?: string; status_kepengurusan?: string; search?: string },
+        pagination?: Pagination
+    ) {
+        // cabor!inner: join inner agar filter pencarian nama cabor deterministik.
+        // Aman karena cabor_id adalah FK NOT NULL — tidak ada baris kepengurusan tanpa cabor.
+        const selectStr = "*, cabor!inner(nama_cabor)";
+        let query = pagination
+            ? supabase.from("kepengurusan").select(selectStr, { count: "exact" })
+            : supabase.from("kepengurusan").select(selectStr);
 
         if (filters?.cabor_id) {
             query = query.eq("cabor_id", filters.cabor_id);
@@ -17,20 +26,35 @@ export const KepengurusanRepository = {
             query = query.eq("status_kepengurusan", filters.status_kepengurusan);
         }
         if (filters?.search) {
-            // Pencarian sebagian pada ketua_umum, ketua_harian, sekretaris, atau nomor_sk
+            // Pencarian sebagian pada nama cabor, ketua_umum, ketua_harian, sekretaris, atau nomor_sk.
+            // Koma dihilangkan agar tidak memecah sintaks or() PostgREST.
+            const s = filters.search.replace(/,/g, " ");
             query = query.or(
-                `ketua_umum.ilike.%${filters.search}%,` +
-                `ketua_harian.ilike.%${filters.search}%,` +
-                `sekretaris.ilike.%${filters.search}%,` +
-                `nomor_sk.ilike.%${filters.search}%`
+                `cabor.nama_cabor.ilike.%${s}%,` +
+                `ketua_umum.ilike.%${s}%,` +
+                `ketua_harian.ilike.%${s}%,` +
+                `sekretaris.ilike.%${s}%,` +
+                `nomor_sk.ilike.%${s}%`
             );
         }
 
-        const { data, error } = await query;
-        
+        // ORDER BY eksplisit agar urutan halaman stabil antar request
+        query = query.order("id", { ascending: true });
+
+        if (pagination) {
+            const from = (pagination.page - 1) * pagination.pageSize;
+            query = query.range(from, from + pagination.pageSize - 1);
+        }
+
+        const { data, count, error } = await query;
+
         if (error) {
             console.error("Gagal mengambil data kepengurusan dari database:", error.message);
             throw error;
+        }
+
+        if (pagination) {
+            return { items: data ?? [], total: count ?? 0 };
         }
         return data;
     },

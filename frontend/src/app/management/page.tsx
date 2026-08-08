@@ -1,22 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ShieldCheck,
   Upload,
   Save,
   Search,
   Download,
-  FileText,
-  Calendar,
   CheckCircle2,
   X,
-  Clock,
   Plus
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { FormSelect } from '@/components/ui/form-select';
+import Pagination from '@/components/ui/pagination';
 
 interface Cabor {
   id: number;
@@ -36,6 +33,9 @@ export interface KepengurusanSK {
   status_kepengurusan: string;
   file_path_sk: string;
 }
+
+// Jumlah arsip per halaman (dipakai di fetch & footer pagination)
+const PAGE_SIZE = 20;
 
 export default function ManagementPage() {
   const [skList, setSkList] = useState<KepengurusanSK[]>([]);
@@ -58,15 +58,56 @@ export default function ManagementPage() {
 
   const [mounted, setMounted] = useState(false);
 
-  const fetchKepengurusan = () => {
-    fetch('/api/kepengurusan')
-      .then(res => res.json())
-      .then(data => {
-        const arr = Array.isArray(data) ? data : data.data || [];
-        setSkList(arr);
-      })
-      .catch(err => console.error("Error fetching kepengurusan:", err));
-  };
+  // Pagination state — tabel hanya merender satu halaman (PAGE_SIZE rekor)
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  // Penjaga race condition: respons basi dari request lama diabaikan
+  const requestSeq = useRef(0);
+
+  // Search server-side + pagination: pencarian berlaku di seluruh dataset,
+  // bukan hanya halaman yang sedang aktif.
+  const loadKepengurusan = useCallback(async () => {
+    const seq = ++requestSeq.current;
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('pageSize', String(PAGE_SIZE));
+    if (searchQuery.trim()) params.set('search', searchQuery.trim());
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/kepengurusan?${params.toString()}`);
+      const data = await res.json();
+      const body = data.data ?? data;
+      if (seq !== requestSeq.current) return; // respons basi (race) — abaikan
+
+      if (Array.isArray(body)) {
+        setSkList(body);
+        setTotal(body.length);
+      } else {
+        const newTotal = body.pagination?.total ?? 0;
+        const totalPages = body.pagination?.totalPages ?? 1;
+        // Halaman melebihi jumlah halaman (mis. data berkurang dari sesi lain) → lompat ke terakhir
+        if (newTotal > 0 && page > totalPages) {
+          setPage(totalPages);
+          return;
+        }
+        setSkList(body.items ?? []);
+        setTotal(newTotal);
+      }
+    } catch (err) {
+      console.error("Error fetching kepengurusan:", err);
+    } finally {
+      if (seq === requestSeq.current) setLoading(false);
+    }
+  }, [page, searchQuery]);
+
+  // Debounce pencarian (350ms) agar tidak refetch per ketukan tombol
+  useEffect(() => {
+    const timer = setTimeout(loadKepengurusan, searchQuery ? 350 : 0);
+    return () => clearTimeout(timer);
+  }, [loadKepengurusan, searchQuery]);
 
   useEffect(() => {
     setMounted(true);
@@ -78,7 +119,6 @@ export default function ManagementPage() {
         if (arr.length > 0) setCabor(arr[0].nama_cabor);
       })
       .catch(err => console.error("Error fetching cabor:", err));
-    fetchKepengurusan();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,7 +167,7 @@ export default function ManagementPage() {
         setShowInputModal(false);
         setShowSuccessAlert(true);
         setTimeout(() => setShowSuccessAlert(false), 4500);
-        fetchKepengurusan();
+        loadKepengurusan();
       } else {
         alert('Gagal menyimpan SK');
       }
@@ -136,13 +176,6 @@ export default function ManagementPage() {
       alert('Terjadi kesalahan koneksi');
     }
   };
-
-  const filteredList = skList.filter(item => {
-    const caborName = caborList.find(c => c.id === item.cabor_id)?.nama_cabor || item.cabor || '';
-    return caborName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.nomor_sk.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.ketua_umum.toLowerCase().includes(searchQuery.toLowerCase());
-  });
 
   const handleDownloadSignedUrl = (sk: KepengurusanSK) => {
     // PRD Non-Functional Security: Akses unduhan dokumen fisik SK tidak boleh berupa tautan statis, 
@@ -154,11 +187,6 @@ export default function ManagementPage() {
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-[#b91c1c] mb-1">
-          <span>Executive Portal</span>
-          <span>•</span>
-          <span>Manajemen SK & Organisasi</span>
-        </div>
         <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Manajemen Organisasi & Histori SK</h1>
         <p className="text-sm text-gray-500 mt-1">
           Kelola kepengurusan cabang olahraga dan arsip Surat Keputusan secara terpusat dan imutabel (*Archive Only*).
@@ -184,10 +212,9 @@ export default function ManagementPage() {
         <div className="px-6 py-4 border-b border-gray-100 space-y-3 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Clock className="w-5 h-5 text-[#b91c1c]" />
               <h2 className="text-lg font-bold text-gray-900">Arsip Histori Kepengurusan Cabor</h2>
               <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
-                {filteredList.length} arsip
+                {total} arsip
               </span>
             </div>
             <button
@@ -210,7 +237,7 @@ export default function ManagementPage() {
                   type="text"
                   placeholder="Cari arsip..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                   className="pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
                 />
               </div>
@@ -232,9 +259,11 @@ export default function ManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
-              {filteredList.map((sk) => {
+              {skList.map((sk) => {
                 const isAktif = sk.status_kepengurusan === 'Aktif';
-                const caborName = caborList.find(c => c.id === sk.cabor_id)?.nama_cabor || sk.cabor || 'N/A';
+                const apiCabor: any = sk.cabor;
+                const extractedCaborName = apiCabor && typeof apiCabor === 'object' ? apiCabor.nama_cabor : apiCabor;
+                const caborName = caborList.find(c => c.id === sk.cabor_id)?.nama_cabor || extractedCaborName || 'N/A';
                 return (
                   <tr key={sk.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-6 font-bold text-gray-900">{caborName}</td>
@@ -244,8 +273,8 @@ export default function ManagementPage() {
                     <td className="py-3.5 px-6">
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-bold border ${isAktif
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-gray-100 text-gray-600 border-gray-200'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-gray-100 text-gray-600 border-gray-200'
                           }`}
                       >
                         {sk.status_kepengurusan || 'Unknown'}
@@ -263,7 +292,7 @@ export default function ManagementPage() {
                   </tr>
                 );
               })}
-              {filteredList.length === 0 && (
+              {skList.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center py-12 text-gray-400 text-sm">
                     Tidak ada arsip SK yang cocok dengan pencarian Anda.
@@ -274,16 +303,15 @@ export default function ManagementPage() {
           </table>
         </div>
 
-        <div className="px-6 py-3 border-t border-gray-100 bg-slate-50 text-xs text-gray-500 flex justify-between items-center shrink-0">
-          <span>Menampilkan 1-{filteredList.length} dari {skList.length} arsip</span>
-          <div className="flex items-center space-x-1">
-            <button className="px-2.5 py-1 rounded bg-white border border-gray-200 text-gray-400 font-bold">&lt;</button>
-            <button className="px-2.5 py-1 rounded bg-[#b91c1c] text-white font-bold">1</button>
-            <button className="px-2.5 py-1 rounded bg-white border border-gray-200 text-gray-800 font-bold">2</button>
-            <button className="px-2.5 py-1 rounded bg-white border border-gray-200 text-gray-800 font-bold">3</button>
-            <button className="px-2.5 py-1 rounded bg-white border border-gray-200 text-gray-800 font-bold">&gt;</button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+          total={total}
+          pageSize={PAGE_SIZE}
+          loading={loading}
+          noun="arsip"
+          onPageChange={setPage}
+        />
       </Card>
 
       {/* Input SK Modal */}
@@ -335,7 +363,7 @@ export default function ManagementPage() {
                     placeholder="Masukkan Nomor Surat Keputusan"
                     value={nomorSk}
                     onChange={(e) => setNomorSk(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
                   />
                 </div>
 
@@ -348,7 +376,7 @@ export default function ManagementPage() {
                       type="date"
                       value={tanggalSk}
                       onChange={(e) => setTanggalSk(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-800 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
                     />
                   </div>
                 </div>

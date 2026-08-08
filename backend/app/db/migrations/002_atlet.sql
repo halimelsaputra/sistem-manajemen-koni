@@ -6,8 +6,8 @@ create table if not exists atlet (
     created_at timestamp default current_timestamp,
     updated_at timestamp default current_timestamp);
 
-create index if not exists idx-atlet-nama on atlet(nama_atlet);
-create index if not exists idx-atlet-kabupaten-kota on atlet(kabupaten_kota);
+create index if not exists idx_atlet_nama on atlet(nama_atlet);
+create index if not exists idx_atlet_kabupaten_kota on atlet(kabupaten_kota);
 create index if not exists idx_atlet_cabor_id on atlet(cabor_id);
 
 CREATE INDEX IF NOT EXISTS idx_atlet_kabkota_cabor ON atlet (kabupaten_kota, cabor_id);

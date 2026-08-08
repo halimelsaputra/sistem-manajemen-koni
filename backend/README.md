@@ -1,5 +1,11 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Autentikasi API
+
+Seluruh endpoint `/api/*` pada backend dilindungi oleh `middleware.ts` yang memvalidasi cookie sesi `auth_token` (nilai default: `authenticated`). Cookie di-set oleh aplikasi frontend saat login dan diteruskan ke backend melalui rewrite proxy.
+
+> **Penting:** Nilai cookie harus sama antara frontend dan backend. Setel env `AUTH_TOKEN_VALUE` (secret acak) **di kedua aplikasi** agar cocok. Jika hanya satu sisi yang diset, semua request akan ditolak dengan `401`.
+
 ## Getting Started
 
 First, run the development server:
