@@ -4,9 +4,9 @@ import { ValidationError } from "@/lib/errors";
 export const PrestasiService = {
     /**
      * Mendapatkan semua data prestasi dengan filter opsional.
-     * @param filters Objek filter { atlet_id, tingkat_lomba, mendali, tahun, search }
+     * @param filters Objek filter { atlet_id, tingkat_lomba, mendali, tanggal, search }
      */
-    async getAll(filters?: { atlet_id?: string; tingkat_lomba?: string; mendali?: string; tahun?: string; search?: string }) {
+    async getAll(filters?: { atlet_id?: string; tingkat_lomba?: string; mendali?: string; tanggal?: string; search?: string }) {
         return await PrestasiRepository.findAll(filters);
     },
 
@@ -25,13 +25,13 @@ export const PrestasiService = {
     async create(data: {
         atlet_id: number;
         event_kejuaraan: string;
-        tahun: number;
+        tanggal: string;
         tingkat_lomba: "Daerah" | "Nasional" | "Internasional";
         mendali: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali";
     }) {
         // Validasi parameter wajib
-        if (!data.atlet_id || !data.event_kejuaraan || !data.tahun || !data.tingkat_lomba || !data.mendali) {
-            throw new ValidationError("Semua field (atlet_id, event_kejuaraan, tahun, tingkat_lomba, mendali) wajib diisi.");
+        if (!data.atlet_id || !data.event_kejuaraan || !data.tanggal || !data.tingkat_lomba || !data.mendali) {
+            throw new ValidationError("Semua field (atlet_id, event_kejuaraan, tanggal, tingkat_lomba, mendali) wajib diisi.");
         }
 
         // Validasi enum tingkat_lomba
@@ -49,7 +49,7 @@ export const PrestasiService = {
         return await PrestasiRepository.create({
             atlet_id: data.atlet_id,
             event_kejuaraan: data.event_kejuaraan.trim(),
-            tahun: Number(data.tahun),
+            tanggal: data.tanggal,
             tingkat_lomba: data.tingkat_lomba,
             mendali: data.mendali
         });
@@ -65,7 +65,7 @@ export const PrestasiService = {
         data: Partial<{
             atlet_id: number;
             event_kejuaraan: string;
-            tahun: number;
+            tanggal: string;
             tingkat_lomba: "Daerah" | "Nasional" | "Internasional";
             mendali: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali";
         }>
@@ -87,7 +87,7 @@ export const PrestasiService = {
 
         const payload: any = { ...data };
         if (data.event_kejuaraan) payload.event_kejuaraan = data.event_kejuaraan.trim();
-        if (data.tahun) payload.tahun = Number(data.tahun);
+        if (data.tanggal) payload.tanggal = data.tanggal;
 
         return await PrestasiRepository.update(id, payload);
     },

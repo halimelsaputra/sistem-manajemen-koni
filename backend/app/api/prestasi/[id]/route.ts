@@ -48,7 +48,7 @@ export async function GET(
 /**
  * Endpoint PUT /api/prestasi/[id]
  * Memperbarui data prestasi tertentu berdasarkan ID.
- * Request Body: Partial<{ atlet_id: number, event_kejuaraan: string, tahun: number, tingkat_lomba: string, mendali: string }>
+ * Request Body: Partial<{ atlet_id: number, event_kejuaraan: string, tanggal: string, tingkat_lomba: string, mendali: string }>
  */
 export async function PUT(
     req: Request,
