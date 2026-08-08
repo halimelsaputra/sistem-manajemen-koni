@@ -4,7 +4,7 @@ import { ValidationError } from "@/lib/errors";
 
 /**
  * Endpoint GET /api/prestasi
- * Mengambil data prestasi dengan filter opsional (atlet_id, tingkat_lomba, mendali, tahun, search).
+ * Mengambil data prestasi dengan filter opsional (atlet_id, tingkat_lomba, mendali, tanggal, search).
  */
 export async function GET(req: Request) {
     try {
@@ -12,10 +12,10 @@ export async function GET(req: Request) {
         const atlet_id = searchParams.get("atlet_id") || undefined;
         const tingkat_lomba = searchParams.get("tingkat_lomba") || undefined;
         const mendali = searchParams.get("mendali") || undefined;
-        const tahun = searchParams.get("tahun") || undefined;
+        const tanggal = searchParams.get("tanggal") || undefined;
         const search = searchParams.get("search") || undefined;
 
-        const data = await PrestasiService.getAll({ atlet_id, tingkat_lomba, mendali, tahun, search });
+        const data = await PrestasiService.getAll({ atlet_id, tingkat_lomba, mendali, tanggal, search });
 
         return NextResponse.json(
             {
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 /**
  * Endpoint POST /api/prestasi
  * Menambahkan data prestasi baru.
- * Request Body: { atlet_id: number, event_kejuaraan: string, tahun: number, tingkat_lomba: string, mendali: string }
+ * Request Body: { atlet_id: number, event_kejuaraan: string, tanggal: string, tingkat_lomba: string, mendali: string }
  */
 export async function POST(req: Request) {
     try {

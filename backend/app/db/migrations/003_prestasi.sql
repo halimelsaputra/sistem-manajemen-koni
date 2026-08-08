@@ -16,7 +16,7 @@ create table if not exists prestasi (
     id bigserial primary key,
     atlet_id bigint not null references atlet(id) on delete restrict,
     event_kejuaraan varchar(255) not null,
-    tahun integer not null,
+    tanggal date not null,
     tingkat_lomba tingkat_lomba__enum not null,
     mendali mendali_enum not null default "tidak mendapat peringkat",
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -24,7 +24,7 @@ create table if not exists prestasi (
 );
 
 create index if not exists idx-prestasi-atlet_id on prestasi(atlet_id);
-create index if not exists idx-prestasi-tahun on prestasi(tahun);
+create index if not exists idx-prestasi-tanggal on prestasi(tanggal);
 CREATE INDEX IF NOT EXISTS idx_prestasi_medali ON prestasi (medali);
 
-create index if not exists idx-prestasi-tahun_mendali on prestasi(tahun, mendali);
+create index if not exists idx-prestasi-tanggal_mendali on prestasi(tanggal, mendali);

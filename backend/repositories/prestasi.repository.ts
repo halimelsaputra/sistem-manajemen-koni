@@ -3,9 +3,9 @@ import { supabase } from "@/lib/supabase";
 export const PrestasiRepository = {
     /**
      * Mengambil semua data prestasi beserta relasi data atlet dan cabang olahraganya dengan filter opsional.
-     * @param filters Objek filter { atlet_id, tingkat_lomba, mendali, tahun, search }
+     * @param filters Objek filter { atlet_id, tingkat_lomba, mendali, tanggal, search }
      */
-    async findAll(filters?: { atlet_id?: string; tingkat_lomba?: string; mendali?: string; tahun?: string; search?: string }) {
+    async findAll(filters?: { atlet_id?: string; tingkat_lomba?: string; mendali?: string; tanggal?: string; search?: string }) {
         let query = supabase
             .from("prestasi")
             .select("*, atlet(nama_atlet, kabupaten_kota, cabor(nama_cabor))");
@@ -19,8 +19,8 @@ export const PrestasiRepository = {
         if (filters?.mendali) {
             query = query.eq("mendali", filters.mendali);
         }
-        if (filters?.tahun) {
-            query = query.eq("tahun", filters.tahun);
+        if (filters?.tanggal) {
+            query = query.eq("tanggal", filters.tanggal);
         }
         if (filters?.search) {
             query = query.ilike("event_kejuaraan", `%${filters.search}%`);
@@ -55,12 +55,12 @@ export const PrestasiRepository = {
 
     /**
      * Membuat data prestasi baru.
-     * @param data Payload data prestasi { atlet_id, event_kejuaraan, tahun, tingkat_lomba, mendali }
+     * @param data Payload data prestasi { atlet_id, event_kejuaraan, tanggal, tingkat_lomba, mendali }
      */
     async create(data: {
         atlet_id: number;
         event_kejuaraan: string;
-        tahun: number;
+        tanggal: string;
         tingkat_lomba: "Daerah" | "Nasional" | "Internasional";
         mendali: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali";
     }) {
@@ -87,7 +87,7 @@ export const PrestasiRepository = {
         data: Partial<{
             atlet_id: number;
             event_kejuaraan: string;
-            tahun: number;
+            tanggal: string;
             tingkat_lomba: "Daerah" | "Nasional" | "Internasional";
             mendali: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali";
         }>
