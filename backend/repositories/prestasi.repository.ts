@@ -47,11 +47,30 @@ export const PrestasiRepository = {
         }
         if (filters?.search) {
             // Cari nama event ATAU nama atlet (cross-table OR).
+            // PostgREST TIDAK mendukung kolom relasi (atlet.nama_atlet) di dalam or().
+            // Solusi: cari dulu atlet yang namanya cocok, lalu pakai atlet_id.in()
+            // (kolom lokal) di dalam or().
             // Koma dihilangkan agar tidak memecah sintaks or() PostgREST.
             const s = filters.search.replace(/,/g, " ");
-            query = query.or(
-                `event_kejuaraan.ilike.%${s}%,atlet.nama_atlet.ilike.%${s}%`
-            );
+            const { data: matchedAtlets, error: atletErr } = await supabase
+                .from("atlet")
+                .select("id")
+                .ilike("nama_atlet", `%${s}%`)
+                .limit(1000);
+
+            if (atletErr) {
+                console.error("Gagal mencari atlet untuk filter search:", atletErr.message);
+                throw atletErr;
+            }
+
+            const atletIds = (matchedAtlets ?? []).map((a: { id: number }) => a.id);
+            if (atletIds.length > 0) {
+                query = query.or(
+                    `event_kejuaraan.ilike.%${s}%,atlet_id.in.(${atletIds.join(",")})`
+                );
+            } else {
+                query = query.ilike("event_kejuaraan", `%${s}%`);
+            }
         }
 
         // ORDER BY eksplisit agar urutan halaman stabil antar request

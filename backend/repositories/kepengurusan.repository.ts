@@ -27,15 +27,33 @@ export const KepengurusanRepository = {
         }
         if (filters?.search) {
             // Pencarian sebagian pada nama cabor, ketua_umum, ketua_harian, sekretaris, atau nomor_sk.
+            // PostgREST TIDAK mendukung kolom relasi (cabor.nama_cabor) di dalam or().
+            // Solusi: cari dulu cabor yang namanya cocok, lalu pakai cabor_id.in()
+            // (kolom lokal) di dalam or().
             // Koma dihilangkan agar tidak memecah sintaks or() PostgREST.
             const s = filters.search.replace(/,/g, " ");
-            query = query.or(
-                `cabor.nama_cabor.ilike.%${s}%,` +
-                `ketua_umum.ilike.%${s}%,` +
-                `ketua_harian.ilike.%${s}%,` +
-                `sekretaris.ilike.%${s}%,` +
-                `nomor_sk.ilike.%${s}%`
-            );
+            const { data: matchedCabors, error: caborErr } = await supabase
+                .from("cabor")
+                .select("id")
+                .ilike("nama_cabor", `%${s}%`)
+                .limit(1000);
+
+            if (caborErr) {
+                console.error("Gagal mencari cabor untuk filter search:", caborErr.message);
+                throw caborErr;
+            }
+
+            const conditions = [
+                `ketua_umum.ilike.%${s}%`,
+                `ketua_harian.ilike.%${s}%`,
+                `sekretaris.ilike.%${s}%`,
+                `nomor_sk.ilike.%${s}%`,
+            ];
+            const caborIds = (matchedCabors ?? []).map((c: { id: number }) => c.id);
+            if (caborIds.length > 0) {
+                conditions.push(`cabor_id.in.(${caborIds.join(",")})`);
+            }
+            query = query.or(conditions.join(","));
         }
 
         // ORDER BY eksplisit agar urutan halaman stabil antar request
