@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PrestasiService } from "@/services/prestasi.service";
 import { ValidationError } from "@/lib/errors";
+import { validateConfirmPhrase } from "@/lib/delete-guard";
 
 /**
  * Endpoint GET /api/prestasi/[id]
@@ -92,6 +93,7 @@ export async function PUT(
 /**
  * Endpoint DELETE /api/prestasi/[id]
  * Menghapus data prestasi tertentu berdasarkan ID.
+ * Wajib mengirim `confirmText` (frasa "hapus prestasi {nama}") yang divalidasi server.
  */
 export async function DELETE(
     req: Request,
@@ -99,12 +101,48 @@ export async function DELETE(
 ) {
     try {
         const { id } = await params;
-        await PrestasiService.delete(id);
+
+        // Ambil data dulu untuk memvalidasi frasa konfirmasi (server-side guard)
+        const existing = await PrestasiService.getById(id);
+        if (!existing) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: "data prestasi tidak ditemukan"
+                },
+                { status: 404 }
+            );
+        }
+
+        const body = await req.json().catch(() => ({}));
+        const guardError = validateConfirmPhrase(body?.confirmText, `hapus prestasi ${existing.event_kejuaraan}`);
+        if (guardError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: guardError
+                },
+                { status: 400 }
+            );
+        }
+
+        const result = await PrestasiService.delete(id);
+
+        if (!result) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: "data prestasi tidak ditemukan"
+                },
+                { status: 404 }
+            );
+        }
 
         return NextResponse.json(
             {
                 status: "success",
-                message: "data prestasi berhasil dihapus"
+                message: "data prestasi berhasil dihapus",
+                data: result
             },
             { status: 200 }
         );

@@ -47,7 +47,7 @@ export default function Pagination({
   const btnBase = 'px-2.5 py-1 rounded font-bold transition disabled:opacity-40 disabled:cursor-not-allowed';
 
   return (
-    <div className="px-6 py-3 border-t border-gray-100 bg-slate-50 text-xs text-gray-500 flex justify-between items-center shrink-0">
+    <div className="px-4 sm:px-6 py-3 border-t border-gray-100 bg-slate-50 text-xs text-gray-500 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between shrink-0">
       <span className="flex items-center gap-2">
         Menampilkan {from}-{to} dari {total} {noun}
         {loading && (
@@ -55,7 +55,7 @@ export default function Pagination({
         )}
       </span>
 
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center flex-wrap gap-1">
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1 || loading || total === 0}

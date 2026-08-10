@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { Pagination } from "@/lib/pagination";
+import { removeStorageFile } from "@/lib/storage";
 
 export const KepengurusanRepository = {
     /**
@@ -56,8 +57,9 @@ export const KepengurusanRepository = {
             query = query.or(conditions.join(","));
         }
 
-        // ORDER BY eksplisit agar urutan halaman stabil antar request
-        query = query.order("id", { ascending: true });
+        // ORDER BY tanggal_sk (terbaru dulu) lalu id sebagai tie-breaker,
+        // agar urutan halaman stabil antar request dan tampilan selalu terbaru di atas
+        query = query.order("tanggal_sk", { ascending: false }).order("id", { ascending: false });
 
         if (pagination) {
             const from = (pagination.page - 1) * pagination.pageSize;
@@ -82,11 +84,13 @@ export const KepengurusanRepository = {
      * @param id ID Kepengurusan
      */
     async findById(id: string) {
+        // maybeSingle: kembalikan null (bukan error) jika ID tidak ditemukan,
+        // agar route bisa membedakan 404 vs error server.
         const { data, error } = await supabase
             .from("kepengurusan")
             .select("*, cabor(nama_cabor)")
             .eq("id", id)
-            .single();
+            .maybeSingle();
 
         if (error) {
             console.error(`Gagal menemukan kepengurusan dengan ID ${id}:`, error.message);
@@ -157,20 +161,40 @@ export const KepengurusanRepository = {
     },
 
     /**
-     * Menghapus data kepengurusan berdasarkan ID.
+     * Menghapus data kepengurusan berdasarkan ID, termasuk berkas PDF-nya di storage.
      * @param id ID Kepengurusan
+     * @returns null jika ID tidak ditemukan, selain itu { deleted }
      */
     async delete(id: string) {
-        const { error } = await supabase
+        // Ambil path file dulu (sebelum baris dihapus) agar bisa dibersihkan dari storage
+        const { data: existing, error: findErr } = await supabase
+            .from("kepengurusan")
+            .select("file_path_sk")
+            .eq("id", id)
+            .maybeSingle();
+
+        if (findErr) {
+            console.error(`Gagal mengambil kepengurusan dengan ID ${id}:`, findErr.message);
+            throw findErr;
+        }
+
+        const { data: deleted, error } = await supabase
             .from("kepengurusan")
             .delete()
-            .eq("id", id);
+            .eq("id", id)
+            .select("id");
 
         if (error) {
             console.error(`Gagal menghapus kepengurusan dengan ID ${id}:`, error.message);
             throw error;
         }
-        return true;
+
+        if (!deleted || deleted.length === 0) return null; // ID tidak ditemukan
+
+        // Best-effort: hapus berkas PDF dari storage (kegagalan tidak menggagalkan hapus data)
+        await removeStorageFile(existing?.file_path_sk);
+
+        return { deleted: true };
     },
 
     /**

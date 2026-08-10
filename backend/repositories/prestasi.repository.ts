@@ -73,8 +73,9 @@ export const PrestasiRepository = {
             }
         }
 
-        // ORDER BY eksplisit agar urutan halaman stabil antar request
-        query = query.order("id", { ascending: true });
+        // ORDER BY tanggal (terbaru dulu) lalu id sebagai tie-breaker,
+        // agar urutan halaman stabil antar request dan tampilan selalu terbaru di atas
+        query = query.order("tanggal", { ascending: false }).order("id", { ascending: false });
 
         if (pagination) {
             const from = (pagination.page - 1) * pagination.pageSize;
@@ -99,11 +100,13 @@ export const PrestasiRepository = {
      * @param id ID Prestasi
      */
     async findById(id: string) {
+        // maybeSingle: kembalikan null (bukan error) jika ID tidak ditemukan,
+        // agar route bisa membedakan 404 vs error server.
         const { data, error } = await supabase
             .from("prestasi")
             .select("*, atlet(nama_atlet, kabupaten_kota, cabor(nama_cabor))")
             .eq("id", id)
-            .single();
+            .maybeSingle();
 
         if (error) {
             console.error(`Gagal menemukan prestasi dengan ID ${id}:`, error.message);
@@ -168,17 +171,22 @@ export const PrestasiRepository = {
     /**
      * Menghapus data prestasi berdasarkan ID.
      * @param id ID Prestasi
+     * @returns null jika ID tidak ditemukan, selain itu { deleted }
      */
     async delete(id: string) {
-        const { error } = await supabase
+        const { data: deleted, error } = await supabase
             .from("prestasi")
             .delete()
-            .eq("id", id);
+            .eq("id", id)
+            .select("id");
 
         if (error) {
             console.error(`Gagal menghapus prestasi dengan ID ${id}:`, error.message);
             throw error;
         }
-        return true;
+
+        if (!deleted || deleted.length === 0) return null; // ID tidak ditemukan
+
+        return { deleted: true };
     }
 };

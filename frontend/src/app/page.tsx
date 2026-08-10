@@ -60,6 +60,51 @@ interface ExpiringSK {
   days_remaining: number;
 }
 
+// Daftar wilayah — dipakai ulang untuk panel desktop (ExpandableCard) & mobile (tab Daftar).
+// Komponen di module level agar react-compiler dapat mengoptimasi dengan benar.
+function RegionList({
+  regions,
+  activeRegionId,
+  onSelectRegion,
+}: {
+  regions: RegionMedal[];
+  activeRegionId?: string | null;
+  onSelectRegion: (region: RegionMedal) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-2">
+      {regions.map((region) => {
+        const isSelected = activeRegionId === region.id;
+        return (
+          <button
+            key={region.id}
+            onClick={() => onSelectRegion(region)}
+            className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+              isSelected
+                ? 'bg-red-50 text-gray-900 border-red-300 shadow-sm ring-1 ring-red-200'
+                : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-100'
+            }`}
+          >
+            <div>
+              <div className="text-[11px] font-extrabold truncate mb-1">{region.kabupaten_kota}</div>
+            </div>
+            <div>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-sm font-black">{region.total_emas}</span>
+                <span className={`text-[9px] uppercase font-bold ${isSelected ? 'text-[#dc2626]' : 'text-gray-400'}`}>Emas</span>
+              </div>
+              <div
+                className="w-full h-1 rounded-full mt-1.5"
+                style={{ backgroundColor: isSelected ? '#dc2626' : region.color_density_code }}
+              />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [activeRegion, setActiveRegion] = useState<RegionMedal | null>(null);
@@ -67,6 +112,17 @@ export default function DashboardPage() {
   const [prestasiList, setPrestasiList] = useState<any[]>([]);
 
   const [timeFilter, setTimeFilter] = useState<'1BLN' | '3BLN' | '1TH' | '3TH' | 'Maks'>('Maks');
+
+  // Deteksi layar mobile — di mobile peta disembunyikan, hanya daftar wilayah yang ditampilkan
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   useEffect(() => {
     // Fetch Dashboard stats (skWarnings dihitung server-side untuk Early Warning System)
@@ -220,15 +276,14 @@ export default function DashboardPage() {
     }).sort((a, b) => b.total_emas - a.total_emas);
   }, [dashboardData]);
 
-  // If activeRegion is set but not updated with API data, update it
-  useEffect(() => {
-    if (activeRegion && dashboardData) {
-      const updated = mappedRegions.find(r => r.id === activeRegion.id);
-      if (updated && (updated.total_emas !== activeRegion.total_emas || updated.total_perak !== activeRegion.total_perak)) {
-         setActiveRegion(updated);
-      }
-    }
-  }, [dashboardData, mappedRegions, activeRegion]);
+  // Jika wilayah sudah dipilih sebelum data API tiba, sinkronkan jumlah medali dari data terbaru.
+  // Pola resmi React: adjust state during render (tanpa useEffect) agar tidak cascading render.
+  const updatedRegion = activeRegion && dashboardData
+    ? mappedRegions.find(r => r.id === activeRegion.id)
+    : undefined;
+  if (updatedRegion && activeRegion && (updatedRegion.total_emas !== activeRegion.total_emas || updatedRegion.total_perak !== activeRegion.total_perak)) {
+    setActiveRegion(updatedRegion);
+  }
 
 
   const totalEmas = useMemo(() => mappedRegions.reduce((acc, region) => acc + region.total_emas, 0), [mappedRegions]);
@@ -313,8 +368,8 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* 4 KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* 4 KPI Cards — 2×2 di mobile, 4 sejajar di desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
         {statCards.map((card) => (
           <DashboardStatCard
             key={card.id}
@@ -326,90 +381,84 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Peta */}
-      <Card className="relative overflow-hidden h-[650px] lg:h-[720px] animate-slide-in-up">
-        <div className="absolute inset-0">
-          <AcehMap 
-            regions={mappedRegions} 
-            activeRegion={activeRegion} 
-            onSelectRegion={(region) => handleSelectRegion(region)} 
-          />
+      {/* Peta Wilayah (desktop) / Daftar Wilayah (mobile) */}
+      <Card className="relative overflow-hidden h-[520px] sm:h-[620px] lg:h-[720px] animate-slide-in-up">
+        {/* Map — hanya desktop; di mobile peta dihilangkan (tidak dimount) */}
+        {!isMobile && (
+          <div className="absolute inset-0 hidden lg:block">
+            <AcehMap 
+              regions={mappedRegions} 
+              activeRegion={activeRegion} 
+              onSelectRegion={(region) => handleSelectRegion(region)} 
+            />
+          </div>
+        )}
+
+        {/* Desktop: Floating card — Wilayah Terpilih */}
+        {!isMobile && (
+          <Card className={`hidden lg:block absolute left-4 top-20 w-[240px] xl:w-[260px] p-4 bg-white/95 backdrop-blur-sm shadow-md z-20 transition-all duration-300 ease-in-out ${
+            activeRegion
+              ? 'opacity-100 translate-x-0 scale-100'
+              : 'opacity-0 -translate-x-4 scale-95 pointer-events-none'
+          }`}>
+            <div key={activeRegion?.id} className={`animate-fade-in transition-opacity duration-200 ${activeRegion ? 'opacity-100' : 'opacity-0'}`}>
+              <div className="flex items-center justify-between pb-3 border-b border-gray-200 mb-3">
+                <div>
+                  <div className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider">Wilayah Terpilih</div>
+                  <div className="text-lg font-black text-gray-900 leading-tight">{activeRegion?.kabupaten_kota}</div>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-red-50 border border-red-200 text-[#dc2626] flex items-center justify-center font-bold text-xs">
+                  #{activeRegion?.id}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center bg-gray-50 p-2.5 rounded-lg border border-gray-200">
+                <div>
+                  <div className="text-xs font-bold text-gray-500">Emas</div>
+                  <div className="text-lg font-black text-[#dc2626]">{activeRegion?.total_emas}</div>
+                </div>
+                <div className="border-l border-gray-200">
+                  <div className="text-xs font-bold text-gray-500">Perak</div>
+                  <div className="text-lg font-black text-gray-700">{activeRegion?.total_perak}</div>
+                </div>
+                <div className="border-l border-gray-200">
+                  <div className="text-xs font-bold text-gray-500">Perunggu</div>
+                  <div className="text-lg font-black text-amber-600">{activeRegion?.total_perunggu}</div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Desktop: Floating card — Daftar 23 Wilayah */}
+        {!isMobile && (
+          <ExpandableCard title="Daftar 23 Wilayah">
+            <RegionList regions={mappedRegions} activeRegionId={activeRegion?.id} onSelectRegion={handleSelectRegion} />
+          </ExpandableCard>
+        )}
+
+        {/* Mobile: Daftar Wilayah — selalu tampil, tanpa peta */}
+        <div className="lg:hidden absolute inset-3 rounded-2xl bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+            <div className="min-w-0">
+              <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-900">Daftar Wilayah</h3>
+              <p className="text-[10px] text-gray-500 mt-0.5">Persebaran medali per kabupaten/kota</p>
+            </div>
+            <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full shrink-0">
+              {mappedRegions.length} wilayah
+            </span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 scrollbar-thin">
+            <RegionList regions={mappedRegions} activeRegionId={activeRegion?.id} onSelectRegion={handleSelectRegion} />
+          </div>
         </div>
-
-        {/* Floating card — Wilayah Terpilih */}
-        <Card className={`absolute left-4 top-20 w-[240px] xl:w-[260px] p-4 bg-white/95 backdrop-blur-sm shadow-md z-20 transition-all duration-300 ease-in-out ${
-          activeRegion
-            ? 'opacity-100 translate-x-0 scale-100'
-            : 'opacity-0 -translate-x-4 scale-95 pointer-events-none'
-        }`}>
-          <div key={activeRegion?.id} className={`animate-fade-in transition-opacity duration-200 ${activeRegion ? 'opacity-100' : 'opacity-0'}`}>
-            <div className="flex items-center justify-between pb-3 border-b border-gray-200 mb-3">
-              <div>
-                <div className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider">Wilayah Terpilih</div>
-                <div className="text-lg font-black text-gray-900 leading-tight">{activeRegion?.kabupaten_kota}</div>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-red-50 border border-red-200 text-[#dc2626] flex items-center justify-center font-bold text-xs">
-                #{activeRegion?.id}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 text-center bg-gray-50 p-2.5 rounded-lg border border-gray-200">
-              <div>
-                <div className="text-xs font-bold text-gray-500">Emas</div>
-                <div className="text-lg font-black text-[#dc2626]">{activeRegion?.total_emas}</div>
-              </div>
-              <div className="border-l border-gray-200">
-                <div className="text-xs font-bold text-gray-500">Perak</div>
-                <div className="text-lg font-black text-gray-700">{activeRegion?.total_perak}</div>
-              </div>
-              <div className="border-l border-gray-200">
-                <div className="text-xs font-bold text-gray-500">Perunggu</div>
-                <div className="text-lg font-black text-amber-600">{activeRegion?.total_perunggu}</div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Floating card — Daftar 23 Wilayah */}
-        <ExpandableCard title="Daftar 23 Wilayah">
-          <div className="grid grid-cols-1 gap-2">
-            {mappedRegions.map((region) => {
-              const isSelected = activeRegion?.id === region.id;
-              return (
-                <button
-                  key={region.id}
-                  onClick={() => handleSelectRegion(region)}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
-                    isSelected
-                      ? 'bg-red-50 text-gray-900 border-red-300 shadow-sm ring-1 ring-red-200'
-                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-100'
-                  }`}
-                >
-                  <div>
-                    <div className="text-[11px] font-extrabold truncate mb-1">{region.kabupaten_kota}</div>
-                  </div>
-                  <div>
-                    <div className="flex items-baseline justify-between mt-1">
-                      <span className="text-sm font-black">{region.total_emas}</span>
-                      <span className={`text-[9px] uppercase font-bold ${isSelected ? 'text-[#dc2626]' : 'text-gray-400'}`}>Emas</span>
-                    </div>
-                    <div
-                      className="w-full h-1 rounded-full mt-1.5"
-                      style={{ backgroundColor: isSelected ? '#dc2626' : region.color_density_code }}
-                    />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </ExpandableCard>
       </Card>
 
       {/* Tren Performa Medali Tahunan */}
       <Card className="p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h2 className="text-base font-bold text-gray-900">Tren Performa Medali Tahunan</h2>
-          <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg">
+          <div className="flex items-center flex-wrap gap-1 bg-gray-100 p-1 rounded-lg">
             {['1BLN', '3BLN', '1TH', '3TH', 'Maks'].map(filter => (
               <button
                 key={filter}

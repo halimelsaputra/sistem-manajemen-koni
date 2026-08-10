@@ -9,12 +9,14 @@ import {
   Search,
   X,
   CheckCircle2,
-  UserPlus
+  UserPlus,
+  Trash2
 } from 'lucide-react';
 import { MOCK_REGIONS } from '@/data/mockData';
 import { Card } from '@/components/ui/card';
 import { FormSelect } from '@/components/ui/form-select';
 import Pagination from '@/components/ui/pagination';
+import ConfirmDeleteModal from '@/components/ui/confirm-delete-modal';
 
 interface Cabor {
   id: number;
@@ -36,6 +38,16 @@ interface Prestasi {
   tingkat_lomba: string;
   mendali: string;
   atlet?: Atlet;
+}
+
+type DeleteEntity = 'prestasi' | 'atlet' | 'cabor';
+
+interface DeleteTarget {
+  entity: DeleteEntity;
+  id: number;
+  name: string;
+  phrase: string;
+  description: string;
 }
 
 // Jumlah rekor per halaman (dipakai di fetch & footer pagination)
@@ -78,12 +90,26 @@ export default function AthletesPage() {
   const [showAtletModal, setShowAtletModal] = useState(false);
   const [showCaborModal, setShowCaborModal] = useState(false);
 
+  // Delete flow state (konfirmasi ganda + ketik frasa)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<string[]>([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
+
+  // Penjaga race saat mengambil dampak cascade (sama pola dengan requestSeq)
+  const deleteSeq = useRef(0);
+
   const [mounted, setMounted] = useState(false);
 
   // Pagination state — tabel hanya merender satu halaman (PAGE_SIZE rekor)
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  // Pagination client-side untuk tabel manajemen Atlet & Cabor
+  // (list penuh sudah dimuat untuk kebutuhan dropdown/filter, jadi cukup di-slice)
+  const [atletPage, setAtletPage] = useState(1);
+  const [caborPage, setCaborPage] = useState(1);
 
   // Penjaga race condition: respons basi dari request lama diabaikan
   const requestSeq = useRef(0);
@@ -245,6 +271,72 @@ export default function AthletesPage() {
     }
   };
 
+  // Buka modal konfirmasi hapus. Untuk atlet/cabor, ambil dampak cascade
+  // dari backend agar akurat (list frontend terpaginasi / tidak lengkap).
+  const openDeleteModal = async (target: DeleteTarget) => {
+    const seq = ++deleteSeq.current;
+    setDeleteImpact([]);
+    setDeleteTarget(target);
+    try {
+      if (target.entity === 'atlet') {
+        const res = await fetch(`/api/atlet/${target.id}/dependencies`);
+        const data = await res.json();
+        if (seq !== deleteSeq.current) return; // klik baris lain — respons basi diabaikan
+        const deps = data.data ?? {};
+        if (deps.prestasi > 0) setDeleteImpact([`${deps.prestasi} prestasi milik atlet ini`]);
+      } else if (target.entity === 'cabor') {
+        const res = await fetch(`/api/cabor/${target.id}/dependencies`);
+        const data = await res.json();
+        if (seq !== deleteSeq.current) return; // klik baris lain — respons basi diabaikan
+        const deps = data.data ?? {};
+        const parts: string[] = [];
+        if (deps.kepengurusan > 0) parts.push(`${deps.kepengurusan} SK kepengurusan`);
+        if (deps.atlet > 0) parts.push(`${deps.atlet} atlet`);
+        if (deps.prestasi > 0) parts.push(`${deps.prestasi} prestasi`);
+        setDeleteImpact(parts);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil dampak cascade:', err);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/${deleteTarget.entity}/${deleteTarget.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmText: deleteTarget.phrase })
+      });
+      if (res.ok) {
+        const entity = deleteTarget.entity;
+        const nama = deleteTarget.name;
+        setDeleteTarget(null);
+        setDeleteSuccessMsg(`"${nama}" berhasil dihapus.`);
+        setTimeout(() => setDeleteSuccessMsg(null), 4000);
+        if (entity === 'prestasi') {
+          loadPrestasi();
+        } else if (entity === 'atlet') {
+          fetchAtlet();
+          loadPrestasi(); // prestasi atlet ikut terhapus (cascade)
+        } else {
+          fetchCabor();
+          fetchAtlet();
+          loadPrestasi();
+        }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.message || 'Gagal menghapus data.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan saat menghapus.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const getAtletDetails = (atlet_id: number, atlet?: any) => {
     if (atlet) {
        const apiCabor: any = atlet.cabor;
@@ -261,11 +353,22 @@ export default function AthletesPage() {
   const caborOptions = caborList.map(c => c.nama_cabor);
   const atletOptions = atletList.map(a => a.nama_atlet);
 
+  // Potongan halaman untuk tabel manajemen (client-side).
+  // Safe page dihitung langsung (bukan via useEffect) agar tidak ada frame kosong
+  // sesaat saat list menyusut (mis. user di halaman 5 lalu data terhapus hingga sisa 2 halaman).
+  const atletMaxPage = Math.max(1, Math.ceil(atletList.length / PAGE_SIZE));
+  const atletSafePage = Math.min(atletPage, atletMaxPage);
+  const atletPageItems = atletList.slice((atletSafePage - 1) * PAGE_SIZE, atletSafePage * PAGE_SIZE);
+
+  const caborMaxPage = Math.max(1, Math.ceil(caborList.length / PAGE_SIZE));
+  const caborSafePage = Math.min(caborPage, caborMaxPage);
+  const caborPageItems = caborList.slice((caborSafePage - 1) * PAGE_SIZE, caborSafePage * PAGE_SIZE);
+
   return (
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Direktori Prestasi Atlet</h1>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Direktori Prestasi Atlet</h1>
         <p className="text-sm text-gray-500 mt-1">
           Manajemen pencapaian atlet regional secara terstruktur dan terukur.
         </p>
@@ -283,10 +386,22 @@ export default function AthletesPage() {
         </div>
       )}
 
+      {deleteSuccessMsg && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-xl flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center space-x-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span className="text-sm font-semibold">{deleteSuccessMsg}</span>
+          </div>
+          <button onClick={() => setDeleteSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Table Section */}
       <Card className="rounded-2xl overflow-hidden py-0 flex flex-col min-h-[780px]">
         <div className="px-6 py-4 border-b border-gray-100 space-y-3 shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center space-x-3">
               <h2 className="text-lg font-bold text-gray-900">Database Prestasi Regional</h2>
               <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
@@ -311,8 +426,8 @@ export default function AthletesPage() {
             </div>
           </div>
 
-          <div className="flex flex-nowrap items-end gap-2">
-            <div className="relative shrink-0">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="relative w-full sm:w-auto sm:min-w-[240px] shrink-0">
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                 Cari
               </label>
@@ -323,7 +438,7 @@ export default function AthletesPage() {
                   placeholder="Cari atlet atau event..."
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                  className="pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
                 />
               </div>
             </div>
@@ -348,9 +463,9 @@ export default function AthletesPage() {
           </div>
         </div>
 
-        {/* Table Content */}
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse">
+        {/* Table Content — scroll horizontal di layar kecil agar kolom tidak remuk */}
+        <div className="flex-1 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-slate-50">
               <tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
                 <th className="py-3.5 px-6">Nama Atlet</th>
@@ -358,6 +473,7 @@ export default function AthletesPage() {
                 <th className="py-3.5 px-6">Cabor</th>
                 <th className="py-3.5 px-6">Event</th>
                 <th className="py-3.5 px-6">Medali</th>
+                <th className="py-3.5 px-6 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
@@ -388,12 +504,27 @@ export default function AthletesPage() {
                         {item.mendali}
                       </span>
                     </td>
+                    <td className="py-3.5 px-6 text-right">
+                      <button
+                        onClick={() => openDeleteModal({
+                          entity: 'prestasi',
+                          id: item.id,
+                          name: item.event_kejuaraan,
+                          phrase: `hapus prestasi ${item.event_kejuaraan}`,
+                          description: `Anda akan menghapus prestasi "${item.event_kejuaraan}" milik ${details.nama} (${formatTanggal(item.tanggal)}).`
+                        })}
+                        title="Hapus prestasi"
+                        className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
               {prestasiList.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center py-12 text-gray-400 text-sm">
+                  <td colSpan={6} className="text-center py-12 text-gray-400 text-sm">
                     Tidak ada data atlet/prestasi yang cocok dengan pencarian filter Anda.
                   </td>
                 </tr>
@@ -409,6 +540,139 @@ export default function AthletesPage() {
           pageSize={PAGE_SIZE}
           loading={loading}
           onPageChange={setPage}
+        />
+      </Card>
+
+      {/* Manajemen Data Atlet */}
+      <Card className="rounded-2xl overflow-hidden py-0">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center space-x-3">
+            <h2 className="text-lg font-bold text-gray-900">Manajemen Data Atlet</h2>
+            <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
+              {atletList.length} atlet
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Hapus data atlet. Menghapus atlet akan menghapus seluruh prestasinya secara permanen.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px] text-left border-collapse">
+          <thead className="bg-slate-50">
+            <tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
+              <th className="py-2.5 px-6">Nama</th>
+              <th className="py-2.5 px-6">Daerah</th>
+              <th className="py-2.5 px-6">Cabor</th>
+              <th className="py-2.5 px-6 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 text-sm">
+            {atletPageItems.map((a) => {
+              const caborName = caborList.find(c => c.id === a.cabor_id)?.nama_cabor || 'Unknown';
+              return (
+                <tr key={a.id} className="hover:bg-slate-50/60 transition">
+                  <td className="py-3 px-6 font-bold text-gray-900">{a.nama_atlet}</td>
+                  <td className="py-3 px-6 text-gray-600 font-medium">{a.kabupaten_kota}</td>
+                  <td className="py-3 px-6 font-semibold text-gray-800">{caborName}</td>
+                  <td className="py-3 px-6 text-right">
+                    <button
+                      onClick={() => openDeleteModal({
+                        entity: 'atlet',
+                        id: a.id,
+                        name: a.nama_atlet,
+                        phrase: `hapus atlet ${a.nama_atlet}`,
+                        description: `Anda akan menghapus atlet "${a.nama_atlet}" (${a.kabupaten_kota}, ${caborName}) beserta seluruh prestasinya.`
+                      })}
+                      title="Hapus atlet (cascade ke prestasi)"
+                      className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+            {atletPageItems.length === 0 && (
+              <tr>
+                <td colSpan={4} className="text-center py-8 text-gray-400 text-sm">
+                  Belum ada data atlet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        </div>
+        <Pagination
+          page={atletSafePage}
+          totalPages={atletMaxPage}
+          total={atletList.length}
+          pageSize={PAGE_SIZE}
+          noun="atlet"
+          onPageChange={setAtletPage}
+        />
+      </Card>
+
+      {/* Manajemen Data Cabor */}
+      <Card className="rounded-2xl overflow-hidden py-0">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center space-x-3">
+            <h2 className="text-lg font-bold text-gray-900">Manajemen Data Cabor</h2>
+            <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
+              {caborList.length} cabor
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Hapus data cabor. Menghapus cabor akan menghapus seluruh atlet, prestasi, dan SK terkait secara permanen.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[340px] text-left border-collapse">
+            <thead className="bg-slate-50">
+              <tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
+                <th className="py-2.5 px-6">Nama Cabor</th>
+              <th className="py-2.5 px-6 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 text-sm">
+            {caborPageItems.map((c) => (
+              <tr key={c.id} className="hover:bg-slate-50/60 transition">
+                <td className="py-3 px-6 font-bold text-gray-900">{c.nama_cabor}</td>
+                <td className="py-3 px-6 text-right">
+                  <button
+                    onClick={() => openDeleteModal({
+                      entity: 'cabor',
+                      id: c.id,
+                      name: c.nama_cabor,
+                      phrase: `hapus cabor ${c.nama_cabor}`,
+                      description: `Anda akan menghapus cabor "${c.nama_cabor}". Seluruh atlet, prestasi, dan SK yang terkait akan ikut terhapus permanen.`
+                    })}
+                    title="Hapus cabor (cascade ke atlet, prestasi & SK)"
+                    className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {caborPageItems.length === 0 && (
+              <tr>
+                <td colSpan={2} className="text-center py-8 text-gray-400 text-sm">
+                  Belum ada data cabor.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        </div>
+        <Pagination
+          page={caborSafePage}
+          totalPages={caborMaxPage}
+          total={caborList.length}
+          pageSize={PAGE_SIZE}
+          noun="cabor"
+          onPageChange={setCaborPage}
         />
       </Card>
 
@@ -648,6 +912,20 @@ export default function AthletesPage() {
         </div>,
         document.body
       )}
+
+      {/* Confirm Delete Modal (konfirmasi ganda + ketik frasa) */}
+      <ConfirmDeleteModal
+        open={deleteTarget !== null}
+        title={deleteTarget
+          ? `Hapus ${deleteTarget.entity === 'prestasi' ? 'Prestasi' : deleteTarget.entity === 'atlet' ? 'Atlet' : 'Cabor'}`
+          : ''}
+        description={deleteTarget?.description ?? ''}
+        impact={deleteImpact}
+        confirmPhrase={deleteTarget?.phrase ?? ''}
+        loading={deleteLoading}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }

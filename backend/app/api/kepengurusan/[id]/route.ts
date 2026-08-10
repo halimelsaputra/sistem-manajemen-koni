@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { KepengurusanService } from "@/services/kepengurusan.service";
 import { ValidationError } from "@/lib/errors";
+import { validateConfirmPhrase } from "@/lib/delete-guard";
 
 /**
  * Endpoint GET /api/kepengurusan/[id]
@@ -91,7 +92,8 @@ export async function PUT(
 
 /**
  * Endpoint DELETE /api/kepengurusan/[id]
- * Menghapus data kepengurusan tertentu berdasarkan ID.
+ * Menghapus data kepengurusan tertentu beserta berkas PDF-nya di storage.
+ * Wajib mengirim `confirmText` (frasa "hapus sk {nomor_sk}") yang divalidasi server.
  */
 export async function DELETE(
     req: Request,
@@ -99,12 +101,48 @@ export async function DELETE(
 ) {
     try {
         const { id } = await params;
-        await KepengurusanService.delete(id);
+
+        // Ambil data dulu untuk memvalidasi frasa konfirmasi (server-side guard)
+        const existing = await KepengurusanService.getById(id);
+        if (!existing) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: "data kepengurusan tidak ditemukan"
+                },
+                { status: 404 }
+            );
+        }
+
+        const body = await req.json().catch(() => ({}));
+        const guardError = validateConfirmPhrase(body?.confirmText, `hapus sk ${existing.nomor_sk}`);
+        if (guardError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: guardError
+                },
+                { status: 400 }
+            );
+        }
+
+        const result = await KepengurusanService.delete(id);
+
+        if (!result) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: "data kepengurusan tidak ditemukan"
+                },
+                { status: 404 }
+            );
+        }
 
         return NextResponse.json(
             {
                 status: "success",
-                message: "data kepengurusan berhasil dihapus"
+                message: "data kepengurusan berhasil dihapus",
+                data: result
             },
             { status: 200 }
         );

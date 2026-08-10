@@ -53,11 +53,13 @@ export const AtletRepository = {
      * @param id ID Atlet yang dicari
      */
     async findByid(id: string) {
+        // maybeSingle: kembalikan null (bukan error) jika ID tidak ditemukan,
+        // agar route bisa membedakan 404 vs error server.
         const { data, error } = await supabase
             .from("atlet")
             .select("*, cabor(nama_cabor)")
             .eq("id", id)
-            .single();
+            .maybeSingle();
 
         if (error) {
             console.error(`Gagal menemukan atlet dengan ID ${id}:`, error.message);
@@ -105,19 +107,68 @@ export const AtletRepository = {
     },
 
     /**
-     * Menghapus data atlet berdasarkan ID.
+     * Menghitung jumlah prestasi yang dimiliki seorang atlet.
+     * Dipakai untuk menampilkan dampak cascade sebelum konfirmasi hapus.
+     * @param atletId ID Atlet
+     */
+    async countPrestasi(atletId: string) {
+        const { count, error } = await supabase
+            .from("prestasi")
+            .select("id", { count: "exact", head: true })
+            .eq("atlet_id", atletId);
+
+        if (error) {
+            console.error(`Gagal menghitung prestasi atlet ${atletId}:`, error.message);
+            throw error;
+        }
+        return count ?? 0;
+    },
+
+    /**
+     * Menghapus atlet beserta seluruh prestasi miliknya (cascade di level service).
+     * Urutan penting: prestasi harus dihapus DULU karena FK prestasi.atlet_id RESTRICT.
      * @param id ID Atlet yang akan dihapus
+     * @returns null jika ID tidak ditemukan, selain itu { deleted, cascade }
      */
     async delete(id: string) {
-        const { error } = await supabase
+        // 1) Ambil & hapus seluruh prestasi milik atlet ini
+        const { data: prestasiRows, error: prestasiErr } = await supabase
+            .from("prestasi")
+            .select("id")
+            .eq("atlet_id", id);
+
+        if (prestasiErr) {
+            console.error(`Gagal mengambil prestasi atlet ${id}:`, prestasiErr.message);
+            throw prestasiErr;
+        }
+
+        const prestasiIds = (prestasiRows ?? []).map((p: { id: number }) => p.id);
+        if (prestasiIds.length > 0) {
+            const { error: delPrestasiErr } = await supabase
+                .from("prestasi")
+                .delete()
+                .in("id", prestasiIds);
+
+            if (delPrestasiErr) {
+                console.error(`Gagal menghapus prestasi atlet ${id}:`, delPrestasiErr.message);
+                throw delPrestasiErr;
+            }
+        }
+
+        // 2) Hapus atlet itu sendiri
+        const { data: deleted, error } = await supabase
             .from("atlet")
             .delete()
-            .eq("id", id);
+            .eq("id", id)
+            .select("id");
 
         if (error) {
             console.error(`Gagal menghapus atlet dengan ID ${id}:`, error.message);
             throw error;
         }
-        return true;
+
+        if (!deleted || deleted.length === 0) return null; // ID tidak ditemukan
+
+        return { deleted: true, cascade: { prestasi: prestasiIds.length } };
     }
 };

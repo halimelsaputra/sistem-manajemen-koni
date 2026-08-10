@@ -41,6 +41,36 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Background aplikasi — foto di semua layar.
+   Mobile memakai pseudo-element fixed (bukan background-attachment: fixed)
+   karena attachment fixed sering bermasalah di browser mobile/iOS (foto terpotong/offset). */
+.app-background {
+  position: relative;
+  isolation: isolate;
+  background-image: url('/img/background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+@media (max-width: 1023px) {
+  .app-background {
+    /* Mobile: gradien putih → merah lembut (tema KONI) */
+    background-image: none;
+    background-color: #fef2f2; /* fallback */
+  }
+  .app-background::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(120% 70% at 50% 0%, rgba(254, 202, 202, 0.6) 0%, transparent 60%),
+      linear-gradient(180deg, #ffffff 0%, #fef2f2 45%, #fde8e8 75%, #fecaca 100%);
+  }
+}
+
 /* Custom Leaflet Tooltip for Choropleth Vector Map */
 .custom-region-tooltip {
   background-color: white !important;

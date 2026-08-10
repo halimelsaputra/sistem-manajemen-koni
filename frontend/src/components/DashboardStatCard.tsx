@@ -30,7 +30,7 @@ export default function DashboardStatCard({
     <Card
       onClick={onClick}
       style={{ animationDelay: delay }}
-      className={`p-4 transition-all duration-300 ease-out cursor-pointer animate-slide-in-up ${
+      className={`p-3 sm:p-4 transition-all duration-300 ease-out cursor-pointer animate-slide-in-up ${
         isActive
           ? 'bg-[#dc2626] text-white shadow-xl scale-105'
           : isPrimary
@@ -38,10 +38,10 @@ export default function DashboardStatCard({
             : 'bg-white text-gray-900 hover:shadow-xl hover:scale-105 shadow-lg'
       }`}
     >
-      <div className="flex items-start justify-between mb-3">
-        <h3 className="text-xs font-medium opacity-90">{title}</h3>
+      <div className="flex items-start justify-between mb-2 sm:mb-3 gap-2">
+        <h3 className="text-[10px] sm:text-xs font-medium opacity-90 leading-tight">{title}</h3>
         <div
-          className={`w-6 h-6 rounded-full ${
+          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full shrink-0 ${
             isActive || isPrimary ? 'bg-white/20' : 'bg-[#dc2626]'
           } flex items-center justify-center transition-transform duration-300 ${
             isActive ? 'rotate-45' : ''
@@ -50,7 +50,7 @@ export default function DashboardStatCard({
           <ArrowUpRight className="w-3 h-3 text-white" />
         </div>
       </div>
-      <p className="text-3xl font-bold mb-2">{value}</p>
+      <p className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">{value}</p>
       <div className="flex items-center gap-1.5 text-xs opacity-80">
         {increase && (
           <>

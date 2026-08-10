@@ -9,11 +9,13 @@ import {
   Download,
   CheckCircle2,
   X,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { FormSelect } from '@/components/ui/form-select';
 import Pagination from '@/components/ui/pagination';
+import ConfirmDeleteModal from '@/components/ui/confirm-delete-modal';
 
 interface Cabor {
   id: number;
@@ -55,6 +57,12 @@ export default function ManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
+
+  // Delete flow state (konfirmasi ganda + ketik frasa)
+  const [deleteTarget, setDeleteTarget] = useState<KepengurusanSK | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<string[]>([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
 
   const [mounted, setMounted] = useState(false);
 
@@ -195,6 +203,38 @@ export default function ManagementPage() {
     }
   };
 
+  const openDeleteModal = (sk: KepengurusanSK) => {
+    setDeleteImpact(sk.file_path_sk ? ['Berkas PDF di storage akan ikut dihapus'] : []);
+    setDeleteTarget(sk);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/kepengurusan/${deleteTarget.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmText: `hapus sk ${deleteTarget.nomor_sk}` })
+      });
+      if (res.ok) {
+        const nomor = deleteTarget.nomor_sk;
+        setDeleteTarget(null);
+        setDeleteSuccessMsg(`Arsip SK "${nomor}" berhasil dihapus.`);
+        setTimeout(() => setDeleteSuccessMsg(null), 4500);
+        loadKepengurusan();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.message || 'Gagal menghapus SK.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan saat menghapus.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleDownloadSignedUrl = (sk: KepengurusanSK) => {
     // PRD Non-Functional Security: Akses unduhan dokumen fisik SK tidak boleh berupa tautan statis,
     // melainkan wajib melalui *Secure Signed URL* yang kedaluwarsa otomatis dalam waktu 5 menit.
@@ -210,7 +250,7 @@ export default function ManagementPage() {
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Manajemen Organisasi & Histori SK</h1>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Manajemen Organisasi & Histori SK</h1>
         <p className="text-sm text-gray-500 mt-1">
           Kelola kepengurusan cabang olahraga dan arsip Surat Keputusan secara terpusat dan imutabel (*Archive Only*).
         </p>
@@ -230,10 +270,22 @@ export default function ManagementPage() {
         </div>
       )}
 
+      {deleteSuccessMsg && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-xl flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center space-x-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span className="text-sm font-semibold">{deleteSuccessMsg}</span>
+          </div>
+          <button onClick={() => setDeleteSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Table Section: Arsip Histori Kepengurusan Cabor */}
       <Card className="rounded-2xl overflow-hidden py-0 flex flex-col min-h-[780px]">
         <div className="px-6 py-4 border-b border-gray-100 space-y-3 shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center space-x-3">
               <h2 className="text-lg font-bold text-gray-900">Arsip Histori Kepengurusan Cabor</h2>
               <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
@@ -249,8 +301,8 @@ export default function ManagementPage() {
             </button>
           </div>
 
-          <div className="flex flex-nowrap items-end gap-2">
-            <div className="relative shrink-0">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="relative w-full sm:w-auto sm:min-w-[240px] shrink-0">
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                 Cari
               </label>
@@ -261,16 +313,16 @@ export default function ManagementPage() {
                   placeholder="Cari arsip..."
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                  className="pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Table Content */}
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse">
+        {/* Table Content — scroll horizontal di layar kecil agar kolom tidak remuk */}
+        <div className="flex-1 overflow-x-auto">
+          <table className="w-full min-w-[820px] text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-slate-50">
               <tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
                 <th className="py-3.5 px-6">Cabor</th>
@@ -304,19 +356,28 @@ export default function ManagementPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-6 text-right">
-                      <button
-                        onClick={() => handleDownloadSignedUrl(sk)}
-                        disabled={!sk.file_path_sk}
-                        title={sk.file_path_sk ? 'Unduh via Secure Signed URL (5 menit)' : 'SK ini belum memiliki berkas dokumen'}
-                        className={`text-xs font-bold inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition ${
-                          sk.file_path_sk
-                            ? 'text-gray-700 hover:text-[#b91c1c] hover:bg-red-50 bg-slate-100 border-gray-200'
-                            : 'text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed'
-                        }`}
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download PDF</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleDownloadSignedUrl(sk)}
+                          disabled={!sk.file_path_sk}
+                          title={sk.file_path_sk ? 'Unduh via Secure Signed URL (5 menit)' : 'SK ini belum memiliki berkas dokumen'}
+                          className={`text-xs font-bold inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition ${
+                            sk.file_path_sk
+                              ? 'text-gray-700 hover:text-[#b91c1c] hover:bg-red-50 bg-slate-100 border-gray-200'
+                              : 'text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed'
+                          }`}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download PDF</span>
+                        </button>
+                        <button
+                          onClick={() => openDeleteModal(sk)}
+                          title="Hapus SK (permanen)"
+                          className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -483,7 +544,7 @@ export default function ManagementPage() {
               </div>
             </form>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-3 shrink-0">
+            <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex flex-wrap justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowInputModal(false)}
@@ -503,6 +564,20 @@ export default function ManagementPage() {
         </div>,
         document.body
       )}
+
+      {/* Confirm Delete Modal (konfirmasi ganda + ketik frasa) */}
+      <ConfirmDeleteModal
+        open={deleteTarget !== null}
+        title="Hapus SK Kepengurusan"
+        description={deleteTarget
+          ? `Anda akan menghapus arsip SK "${deleteTarget.nomor_sk}" periode ${deleteTarget.masa_bakti} (Ketua Umum: ${deleteTarget.ketua_umum}).`
+          : ''}
+        impact={deleteImpact}
+        confirmPhrase={deleteTarget ? `hapus sk ${deleteTarget.nomor_sk}` : ''}
+        loading={deleteLoading}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }

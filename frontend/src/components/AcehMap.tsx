@@ -13,6 +13,18 @@ interface AcehMapProps {
   onSelectRegion: (region: RegionMedal) => void;
 }
 
+// Di-module level (bukan di dalam komponen) agar tidak remount saat render ulang.
+function ResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
 export default function AcehMap({ regions, activeRegion, onSelectRegion }: AcehMapProps) {
   const centerAceh: [number, number] = [3.85, 96.85];
 
@@ -119,19 +131,8 @@ export default function AcehMap({ regions, activeRegion, onSelectRegion }: AcehM
 
   const hasSelection = activeRegion?.id;
 
-  function ResizeHandler() {
-    const map = useMap();
-    useEffect(() => {
-      const container = map.getContainer();
-      const observer = new ResizeObserver(() => map.invalidateSize());
-      observer.observe(container);
-      return () => observer.disconnect();
-    }, [map]);
-    return null;
-  }
-
   return (
-    <div className="w-full h-full min-h-[560px] rounded-2xl overflow-hidden relative z-10 flex flex-col">
+    <div className="w-full h-full min-h-[480px] rounded-2xl overflow-hidden relative z-10 flex flex-col">
       {/* Header Overlay */}
       <div className="absolute top-4 left-5 right-5 z-[450] flex items-start justify-between pointer-events-none">
         <div>

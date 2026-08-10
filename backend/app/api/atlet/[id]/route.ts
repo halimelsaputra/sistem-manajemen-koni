@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AtletService } from "@/services/atlet.service";
 import { ValidationError } from "@/lib/errors";
+import { validateConfirmPhrase } from "@/lib/delete-guard";
 
 /**
  * Endpoint GET /api/atlet/[id]
@@ -91,7 +92,8 @@ export async function PUT(
 
 /**
  * Endpoint DELETE /api/atlet/[id]
- * Menghapus data atlet tertentu berdasarkan ID.
+ * Menghapus data atlet beserta seluruh prestasi miliknya (cascade).
+ * Wajib mengirim `confirmText` (frasa "hapus atlet {nama}") yang divalidasi server.
  */
 export async function DELETE(
     req: Request,
@@ -99,12 +101,51 @@ export async function DELETE(
 ) {
     try {
         const { id } = await params;
-        await AtletService.delete(id);
 
+        // Ambil data dulu untuk memvalidasi frasa konfirmasi (server-side guard)
+        const existing = await AtletService.getById(id);
+        if (!existing) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: "data atlet tidak ditemukan"
+                },
+                { status: 404 }
+            );
+        }
+
+        const body = await req.json().catch(() => ({}));
+        const guardError = validateConfirmPhrase(body?.confirmText, `hapus atlet ${existing.nama_atlet}`);
+        if (guardError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: guardError
+                },
+                { status: 400 }
+            );
+        }
+
+        const result = await AtletService.delete(id);
+
+        if (!result) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: "data atlet tidak ditemukan"
+                },
+                { status: 404 }
+            );
+        }
+
+        const cascadePrestasi = result.cascade?.prestasi ?? 0;
         return NextResponse.json(
             {
                 status: "success",
-                message: "data atlet berhasil dihapus"
+                message: cascadePrestasi > 0
+                    ? `data atlet berhasil dihapus (beserta ${cascadePrestasi} prestasi terkait)`
+                    : "data atlet berhasil dihapus",
+                data: result
             },
             { status: 200 }
         );

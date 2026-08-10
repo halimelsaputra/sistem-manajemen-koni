@@ -193,16 +193,41 @@ Memperbarui data cabor tertentu.
 }
 ```
 
-### `DELETE /api/cabor/[id]`
-Menghapus cabor berdasarkan ID.
+### `GET /api/cabor/[id]/dependencies` `[BARU]`
+Menampilkan jumlah data yang akan ikut terhapus (cascade) jika cabor ini dihapus.
+Dipakai frontend untuk menampilkan peringatan dampak sebelum konfirmasi hapus.
 
-*   **Status Kode RMM Level 2:** `200 OK` (Sukses terhapus), `404 Not Found`, `500 Internal Server Error` (Gagal jika masih dirujuk oleh tabel atlet/kepengurusan - Foreign Key Restrict).
+*   **Status Kode RMM Level 2:** `200 OK`, `500 Internal Server Error`.
 
 #### Response Sukses (`200 OK`)
 ```json
 {
   "status": "success",
-  "message": "data cabor berhasil dihapus"
+  "message": "dependensi berhasil dihitung",
+  "data": { "atlet": 12, "prestasi": 30, "kepengurusan": 2 }
+}
+```
+
+### `DELETE /api/cabor/[id]`
+Menghapus cabor beserta seluruh data yang bergantung padanya (**cascade di service layer**):
+kepengurusan (SK) + berkas PDF-nya di storage, atlet, dan prestasi para atlet.
+
+*   **Wajib Request Body (JSON):**
+    ```json
+    { "confirmText": "hapus cabor Pencak Silat" }
+    ```
+    Frasa dihitung ulang dari data di database (server-side guard) — mismatch → `400 Bad Request`.
+*   **Status Kode RMM Level 2:** `200 OK` (Sukses terhapus), `400 Bad Request` (frasa konfirmasi salah), `404 Not Found` (ID tidak ada), `500 Internal Server Error`.
+
+#### Response Sukses (`200 OK`)
+```json
+{
+  "status": "success",
+  "message": "data cabor berhasil dihapus (beserta 2 SK, 12 atlet, 30 prestasi terkait)",
+  "data": {
+    "deleted": true,
+    "cascade": { "atlet": 12, "prestasi": 30, "kepengurusan": 2 }
+  }
 }
 ```
 
@@ -327,16 +352,39 @@ Memperbarui data atlet.
 }
 ```
 
-### `DELETE /api/atlet/[id]`
-Menghapus atlet berdasarkan ID.
+### `GET /api/atlet/[id]/dependencies` `[BARU]`
+Menampilkan jumlah prestasi yang akan ikut terhapus (cascade) jika atlet ini dihapus.
 
-*   **Status Kode RMM Level 2:** `200 OK`, `404 Not Found`, `500 Internal Server Error` (Gagal jika masih dirujuk oleh tabel prestasi).
+*   **Status Kode RMM Level 2:** `200 OK`, `500 Internal Server Error`.
 
 #### Response Sukses (`200 OK`)
 ```json
 {
   "status": "success",
-  "message": "data atlet berhasil dihapus"
+  "message": "dependensi berhasil dihitung",
+  "data": { "prestasi": 5 }
+}
+```
+
+### `DELETE /api/atlet/[id]`
+Menghapus atlet beserta seluruh prestasi miliknya (**cascade di service layer**).
+
+*   **Wajib Request Body (JSON):**
+    ```json
+    { "confirmText": "hapus atlet Ahmad Dani" }
+    ```
+    Frasa dihitung ulang dari data di database (server-side guard) — mismatch → `400 Bad Request`.
+*   **Status Kode RMM Level 2:** `200 OK` (Sukses terhapus), `400 Bad Request` (frasa konfirmasi salah), `404 Not Found` (ID tidak ada), `500 Internal Server Error`.
+
+#### Response Sukses (`200 OK`)
+```json
+{
+  "status": "success",
+  "message": "data atlet berhasil dihapus (beserta 5 prestasi terkait)",
+  "data": {
+    "deleted": true,
+    "cascade": { "prestasi": 5 }
+  }
 }
 ```
 
@@ -482,15 +530,21 @@ Mengunduh dokumen PDF SK melalui **Secure Signed URL** (TTL 5 menit, sesuai PRD 
 *   **Catatan:** URL hasil generate BUKAN tautan statis — tidak valid setelah 5 menit.
 
 ### `DELETE /api/kepengurusan/[id]`
-Menghapus arsip kepengurusan berdasarkan ID.
+Menghapus arsip kepengurusan berdasarkan ID, termasuk **berkas PDF-nya di Supabase Storage** (best-effort).
 
-*   **Status Kode RMM Level 2:** `200 OK`, `404 Not Found`.
+*   **Wajib Request Body (JSON):**
+    ```json
+    { "confirmText": "hapus sk SK-KONI-2024-099" }
+    ```
+    Frasa dihitung ulang dari data di database (server-side guard) — mismatch → `400 Bad Request`.
+*   **Status Kode RMM Level 2:** `200 OK` (Sukses terhapus), `400 Bad Request` (frasa konfirmasi salah), `404 Not Found` (ID tidak ada), `500 Internal Server Error`.
 
 #### Response Sukses (`200 OK`)
 ```json
 {
   "status": "success",
-  "message": "data kepengurusan berhasil dihapus"
+  "message": "data kepengurusan berhasil dihapus",
+  "data": { "deleted": true }
 }
 ```
 
@@ -654,7 +708,12 @@ Memperbarui data prestasi.
 ### `DELETE /api/prestasi/[id]`
 Menghapus data prestasi berdasarkan ID.
 
-*   **Status Kode RMM Level 2:** `200 OK`, `404 Not Found`.
+*   **Wajib Request Body (JSON):**
+    ```json
+    { "confirmText": "hapus prestasi PON XXI 2024" }
+    ```
+    Frasa dihitung ulang dari data di database (server-side guard) — mismatch → `400 Bad Request`.
+*   **Status Kode RMM Level 2:** `200 OK` (Sukses terhapus), `400 Bad Request` (frasa konfirmasi salah), `404 Not Found` (ID tidak ada), `500 Internal Server Error`.
 
 #### Response Sukses (`200 OK`)
 ```json

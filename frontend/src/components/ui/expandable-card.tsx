@@ -12,7 +12,7 @@ export function ExpandableCard({ title, children }: ExpandableCardProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="absolute right-4 top-4 w-[240px] xl:w-[260px] z-20 animate-slide-in-right">
+    <div className="hidden lg:block absolute left-3 right-3 bottom-3 flex flex-col-reverse sm:block sm:left-auto sm:right-4 sm:top-4 sm:bottom-auto sm:w-[240px] xl:w-[260px] z-20 animate-slide-in-up sm:animate-slide-in-right">
       {/* Card header — fixed size */}
       <div
         onClick={() => setIsOpen(!isOpen)}
@@ -38,12 +38,12 @@ export function ExpandableCard({ title, children }: ExpandableCardProps) {
           isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         }`}
       >
-        <div className={`-mt-4 overflow-hidden transition-opacity duration-[400ms] ${
+        <div className={`mt-0 sm:-mt-4 overflow-hidden transition-opacity duration-[400ms] ${
           isOpen ? 'opacity-100' : 'opacity-0'
         }`}>
-          <div className="bg-white/95 backdrop-blur-sm border border-t-0 border-gray-200 shadow-md rounded-b-2xl">
+          <div className="bg-white/95 backdrop-blur-sm border border-b-0 sm:border-t-0 border-gray-200 shadow-md rounded-t-2xl sm:rounded-b-2xl">
             <div className="scroll-fade-wrapper expanded">
-                <div className="p-4 pt-5 max-h-[520px] overflow-y-auto scrollbar-thin">
+                <div className="p-4 pt-5 max-h-[40vh] sm:max-h-[520px] overflow-y-auto scrollbar-thin">
                 {children}
               </div>
             </div>
