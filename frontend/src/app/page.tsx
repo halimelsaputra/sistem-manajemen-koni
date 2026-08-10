@@ -264,6 +264,13 @@ export default function DashboardPage() {
     },
   ];
 
+  // Sumbu Y dinamis: skala mengikuti nilai maksimal data (min 5, +30% ruang)
+  // agar grafik tidak terlihat flat saat datanya kecil (mis. 9, 3, 6).
+  const chartYMax = useMemo(() => {
+    const maxVal = trendData.data.length > 0 ? Math.max(...trendData.data) : 0;
+    return Math.max(5, Math.ceil((maxVal * 1.3) / 5) * 5);
+  }, [trendData]);
+
   const lineChartData = {
     labels: trendData.labels,
     datasets: [
@@ -291,7 +298,7 @@ export default function DashboardPage() {
       tooltip: { mode: 'index' as const, intersect: false },
     },
     scales: {
-      y: { beginAtZero: true, max: 100, grid: { color: 'rgba(0,0,0,0.04)' } },
+      y: { beginAtZero: true, max: chartYMax, grid: { color: 'rgba(0,0,0,0.04)' } },
       x: { grid: { display: false } }
     }
   };

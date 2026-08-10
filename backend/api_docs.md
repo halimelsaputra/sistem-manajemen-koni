@@ -454,6 +454,33 @@ Memperbarui data kepengurusan.
 }
 ```
 
+### `POST /api/kepengurusan/upload` `[BARU]`
+Mengunggah dokumen PDF SK ke **Supabase Storage** (bucket privat `sk-documents`).
+
+*   **Request:** `multipart/form-data` dengan field `file` (File).
+*   **Validasi:** wajib PDF asli (cek ekstensi `.pdf` **dan** magic bytes `%PDF-`), ukuran maksimal **5 MB**.
+*   **Status Kode RMM Level 2:** `201 Created`, `400 Bad Request` (bukan PDF / > 5MB), `500 Internal Server Error`.
+*   **Alur:** Frontend upload file → dapat `path` → simpan `path` tsb ke kolom `file_path_sk` saat `POST /api/kepengurusan`.
+
+#### Response Sukses (`201 Created`)
+```json
+{
+  "status": "success",
+  "message": "file berhasil diunggah",
+  "data": {
+    "path": "sk/64c9ba1d-070b-4a82-bd15-344d29116b2d.pdf",
+    "original_name": "sk-contoh.pdf"
+  }
+}
+```
+
+### `GET /api/kepengurusan/[id]/download` `[BARU]`
+Mengunduh dokumen PDF SK melalui **Secure Signed URL** (TTL 5 menit, sesuai PRD Non-Functional Security).
+
+*   **Perilaku:** Backend membuat signed URL (kedaluwarsa otomatis dalam 300 detik) lalu **redirect 307** ke URL storage.
+*   **Status Kode RMM Level 2:** `307 Temporary Redirect` (ke signed URL), `404 Not Found` (SK tidak ada / belum punya berkas), `500 Internal Server Error`.
+*   **Catatan:** URL hasil generate BUKAN tautan statis — tidak valid setelah 5 menit.
+
 ### `DELETE /api/kepengurusan/[id]`
 Menghapus arsip kepengurusan berdasarkan ID.
 
@@ -466,6 +493,15 @@ Menghapus arsip kepengurusan berdasarkan ID.
   "message": "data kepengurusan berhasil dihapus"
 }
 ```
+
+---
+
+## 6. Modul: Storage Dokumen SK
+
+*   **Bucket:** `sk-documents` (privat — tidak bisa diakses publik langsung).
+*   **Lokasi file:** `sk/{uuid}.pdf` di dalam bucket.
+*   **Akses:** hanya melalui backend (service-role). Download lewat signed URL 5 menit.
+*   **Migrasi bucket:** `backend/app/db/migrations/007_create_storage_bucket.sql` — jalankan di Supabase SQL Editor pada setiap environment baru.
 
 ---
 

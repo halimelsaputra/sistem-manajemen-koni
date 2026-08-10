@@ -133,6 +133,10 @@ export default function ManagementPage() {
       alert('Mohon lengkapi Nomor SK, Ketua Umum, dan Sekretaris.');
       return;
     }
+    if (!selectedFile) {
+      alert('Berkas PDF SK wajib diunggah.');
+      return;
+    }
 
     const selectedCabor = caborList.find(c => c.nama_cabor === cabor);
     if (!selectedCabor) {
@@ -140,19 +144,33 @@ export default function ManagementPage() {
       return;
     }
 
-    const payload = {
-      cabor_id: selectedCabor.id,
-      masa_bakti: masaBakti,
-      nomor_sk: nomorSk,
-      tanggal_sk: tanggalSk,
-      ketua_umum: ketuaUmum,
-      ketua_harian: ketuaHarian || undefined,
-      sekretaris: sekretaris,
-      status_kepengurusan: 'Aktif',
-      file_path_sk: selectedFile ? `https://koni-aceh.id/secure/${selectedFile.name}` : undefined
-    };
-
     try {
+      // 1) Upload berkas PDF ke Supabase Storage (backend) → dapat path
+      const uploadForm = new FormData();
+      uploadForm.append('file', selectedFile);
+      const uploadRes = await fetch('/api/kepengurusan/upload', {
+        method: 'POST',
+        body: uploadForm
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok || !uploadData.data?.path) {
+        alert(uploadData.message || 'Gagal mengunggah berkas PDF.');
+        return;
+      }
+
+      // 2) Simpan data SK beserta path file di storage
+      const payload = {
+        cabor_id: selectedCabor.id,
+        masa_bakti: masaBakti,
+        nomor_sk: nomorSk,
+        tanggal_sk: tanggalSk,
+        ketua_umum: ketuaUmum,
+        ketua_harian: ketuaHarian || undefined,
+        sekretaris: sekretaris,
+        status_kepengurusan: 'Aktif',
+        file_path_sk: uploadData.data.path
+      };
+
       const res = await fetch('/api/kepengurusan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -178,9 +196,14 @@ export default function ManagementPage() {
   };
 
   const handleDownloadSignedUrl = (sk: KepengurusanSK) => {
-    // PRD Non-Functional Security: Akses unduhan dokumen fisik SK tidak boleh berupa tautan statis, 
+    // PRD Non-Functional Security: Akses unduhan dokumen fisik SK tidak boleh berupa tautan statis,
     // melainkan wajib melalui *Secure Signed URL* yang kedaluwarsa otomatis dalam waktu 5 menit.
-    alert(`[Simulasi Secure Signed URL]\n\nMenghasilkan token unduhan sementara (TTL: 5 menit)...\nMengunduh berkas: ${sk.nomor_sk}\nURL: ${sk.file_path_sk}?token=signed_jwt_e38a29f&expires_in=300`);
+    // Backend membuat signed URL (TTL 300 detik) lalu redirect ke storage.
+    if (!sk.file_path_sk) {
+      alert('SK ini belum memiliki berkas dokumen.');
+      return;
+    }
+    window.open(`/api/kepengurusan/${sk.id}/download`, '_blank');
   };
 
   return (
@@ -283,7 +306,13 @@ export default function ManagementPage() {
                     <td className="py-3.5 px-6 text-right">
                       <button
                         onClick={() => handleDownloadSignedUrl(sk)}
-                        className="text-xs font-bold text-gray-700 hover:text-[#b91c1c] hover:bg-red-50 inline-flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-lg border border-gray-200 transition"
+                        disabled={!sk.file_path_sk}
+                        title={sk.file_path_sk ? 'Unduh via Secure Signed URL (5 menit)' : 'SK ini belum memiliki berkas dokumen'}
+                        className={`text-xs font-bold inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition ${
+                          sk.file_path_sk
+                            ? 'text-gray-700 hover:text-[#b91c1c] hover:bg-red-50 bg-slate-100 border-gray-200'
+                            : 'text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed'
+                        }`}
                       >
                         <Download className="w-3.5 h-3.5" />
                         <span>Download PDF</span>
@@ -464,7 +493,6 @@ export default function ManagementPage() {
               </button>
               <button
                 type="submit"
-                onClick={handleSubmit}
                 className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
               >
                 <Save className="w-4 h-4" />

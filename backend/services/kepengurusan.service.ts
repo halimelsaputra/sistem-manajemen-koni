@@ -51,7 +51,7 @@ export const KepengurusanService = {
             }
         }
 
-        return await KepengurusanRepository.create({
+        const newKepengurusan = await KepengurusanRepository.create({
             cabor_id: data.cabor_id,
             masa_bakti: data.masa_bakti.trim(),
             nomor_sk: data.nomor_sk.trim(),
@@ -62,6 +62,20 @@ export const KepengurusanService = {
             file_path_sk: data.file_path_sk?.trim(),
             status_kepengurusan: data.status_kepengurusan || "Aktif"
         });
+
+        // Auto-mutasi: jika SK baru berstatus Aktif, matikan SK lama (masih Aktif)
+        // pada cabor yang sama agar hanya SK terbaru yang aktif.
+        if ((data.status_kepengurusan ?? "Aktif") === "Aktif" && newKepengurusan?.id) {
+            try {
+                await KepengurusanRepository.deactivateOthers(data.cabor_id, newKepengurusan.id);
+            } catch (err) {
+                // SK utama sudah tersimpan; kegagalan deaktivasi jangan sampai
+                // dianggap gagal total (klien bisa retry dan membuat duplikasi).
+                console.error("SK baru tersimpan, tapi gagal mematikan SK lama:", err);
+            }
+        }
+
+        return newKepengurusan;
     },
 
     /**
@@ -99,7 +113,20 @@ export const KepengurusanService = {
         if (data.sekretaris) payload.sekretaris = data.sekretaris.trim();
         if (data.file_path_sk) payload.file_path_sk = data.file_path_sk.trim();
 
-        return await KepengurusanRepository.update(id, payload);
+        const updated = await KepengurusanRepository.update(id, payload);
+
+        // Konsistensi di jalur update: jika SK ini di-set menjadi "Aktif",
+        // matikan SK Aktif lain pada cabor yang sama (kecuali dirinya sendiri)
+        // agar tidak ada dua SK aktif sekaligus.
+        if (payload.status_kepengurusan === "Aktif" && updated?.cabor_id != null) {
+            try {
+                await KepengurusanRepository.deactivateOthers(updated.cabor_id, Number(id));
+            } catch (err) {
+                console.error("Gagal mematikan SK lain saat update menjadi Aktif:", err);
+            }
+        }
+
+        return updated;
     },
 
     /**

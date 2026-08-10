@@ -171,5 +171,27 @@ export const KepengurusanRepository = {
             throw error;
         }
         return true;
+    },
+
+    /**
+     * Mematikan (status → "Berakhir") seluruh kepengurusan AKTIF lain
+     * pada cabor yang sama, kecuali ID yang dikecualikan.
+     * Dipakai saat SK baru dibuat agar hanya SK terbaru yang berstatus Aktif.
+     * @param caborId ID cabor target
+     * @param excludeId ID kepengurusan baru yang TIDAK ikut dimatikan
+     */
+    async deactivateOthers(caborId: number, excludeId: number) {
+        const { error } = await supabase
+            .from("kepengurusan")
+            .update({ status_kepengurusan: "Berakhir" })
+            .eq("cabor_id", caborId)
+            .eq("status_kepengurusan", "Aktif")
+            .neq("id", excludeId);
+
+        if (error) {
+            console.error(`Gagal mematikan kepengurusan lama cabor ${caborId}:`, error.message);
+            throw error;
+        }
+        return true;
     }
 };
