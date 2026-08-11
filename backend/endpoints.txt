@@ -1,0 +1,179 @@
+================================================================================
+                    DAFTAR API ENDPOINTS - SISTEM MANAJEMEN KONI
+================================================================================
+Base URL: http://localhost:3000/api
+
+Catatan Umum:
+- Content-Type untuk POST/PUT request wajib menggunakan "application/json".
+- Seluruh endpoint GET list mendukung query parameters opsional (Filtering).
+
+--------------------------------------------------------------------------------
+1. ATLET (Endpoint: /api/atlet)
+--------------------------------------------------------------------------------
+* GET /api/atlet
+  - Deskripsi: Mengambil daftar seluruh atlet.
+  - Query Params (Opsional):
+    - search (string): Pencarian berdasarkan nama atlet (sebagian nama, case-insensitive).
+    - kabupaten_kota (string): Filter berdasarkan wilayah kabupaten/kota atlet.
+    - cabor_id (number): Filter berdasarkan ID cabang olahraga.
+
+* POST /api/atlet
+  - Deskripsi: Menambahkan atlet baru.
+  - Request Body (JSON):
+    {
+      "nama_atlet": "string" (wajib),
+      "kabupaten_kota": "string" (wajib),
+      "cabor_id": number (wajib)
+    }
+
+* GET /api/atlet/[id]
+  - Deskripsi: Mengambil detail data atlet berdasarkan ID.
+
+* PUT /api/atlet/[id]
+  - Deskripsi: Memperbarui data atlet tertentu berdasarkan ID.
+  - Request Body (JSON, Parsial/Opsional):
+    {
+      "nama_atlet": "string",
+      "kabupaten_kota": "string",
+      "cabor_id": number
+    }
+
+* DELETE /api/atlet/[id]
+  - Deskripsi: Menghapus data atlet tertentu berdasarkan ID.
+
+
+--------------------------------------------------------------------------------
+2. CABANG OLAHRAGA (Endpoint: /api/cabor)
+--------------------------------------------------------------------------------
+* GET /api/cabor
+  - Deskripsi: Mengambil seluruh daftar cabang olahraga (cabor).
+  - Query Params (Opsional):
+    - search (string): Pencarian berdasarkan nama cabor (sebagian nama, case-insensitive).
+
+* POST /api/cabor
+  - Deskripsi: Menambahkan cabang olahraga baru.
+  - Request Body (JSON):
+    {
+      "nama_cabor": "string" (wajib)
+    }
+
+* GET /api/cabor/[id]
+  - Deskripsi: Mengambil detail data cabang olahraga berdasarkan ID.
+
+* PUT /api/cabor/[id]
+  - Deskripsi: Memperbarui data cabang olahraga tertentu berdasarkan ID.
+  - Request Body (JSON):
+    {
+      "nama_cabor": "string" (wajib)
+    }
+
+* DELETE /api/cabor/[id]
+  - Deskripsi: Menghapus cabang olahraga berdasarkan ID.
+
+
+--------------------------------------------------------------------------------
+3. KEPENGURUSAN (Endpoint: /api/kepengurusan)
+--------------------------------------------------------------------------------
+* GET /api/kepengurusan
+  - Deskripsi: Mengambil daftar data kepengurusan cabor.
+  - Query Params (Opsional):
+    - cabor_id (number): Filter berdasarkan ID cabor.
+    - status_kepengurusan (string): Filter status kepengurusan ("Aktif" atau "Berakhir").
+    - search (string): Pencarian berdasarkan nama ketua_umum, ketua_harian, sekretaris, atau nomor_sk (case-insensitive).
+
+* POST /api/kepengurusan
+  - Deskripsi: Menambahkan data kepengurusan baru.
+  - Request Body (JSON):
+    {
+      "cabor_id": number (wajib),
+      "masa_bakti": "string" (wajib, contoh: "2025-2029"),
+      "nomor_sk": "string" (wajib),
+      "tanggal_sk": "string" (wajib, format: YYYY-MM-DD),
+      "ketua_umum": "string" (wajib),
+      "ketua_harian": "string" (opsional),
+      "sekretaris": "string" (wajib),
+      "file_path_sk": "string" (opsional),
+      "status_kepengurusan": "string" (opsional, nilai valid: "Aktif" atau "Berakhir", default: "Aktif")
+    }
+
+* GET /api/kepengurusan/[id]
+  - Deskripsi: Mengambil detail data kepengurusan berdasarkan ID.
+
+* PUT /api/kepengurusan/[id]
+  - Deskripsi: Memperbarui data kepengurusan tertentu berdasarkan ID.
+  - Request Body (JSON, Parsial/Opsional):
+    {
+      "cabor_id": number,
+      "masa_bakti": "string",
+      "nomor_sk": "string",
+      "tanggal_sk": "string",
+      "ketua_umum": "string",
+      "ketua_harian": "string",
+      "sekretaris": "string",
+      "file_path_sk": "string",
+      "status_kepengurusan": "string" ("Aktif" | "Berakhir")
+    }
+
+* DELETE /api/kepengurusan/[id]
+  - Deskripsi: Menghapus data kepengurusan berdasarkan ID.
+
+
+--------------------------------------------------------------------------------
+4. PRESTASI (Endpoint: /api/prestasi)
+--------------------------------------------------------------------------------
+* GET /api/prestasi
+  - Deskripsi: Mengambil seluruh daftar prestasi atlet beserta relasi atlet & cabornya.
+  - Query Params (Opsional):
+    - atlet_id (number): Filter berdasarkan ID atlet tertentu.
+    - tingkat_lomba (string): Filter tingkat kompetisi ("Daerah" | "Nasional" | "Internasional").
+    - mendali (string): Filter jenis medali ("Emas" | "Perak" | "Perunggu" | "Tanpa Medali").
+    - tanggal (string): Filter berdasarkan tanggal perolehan (format: YYYY-MM-DD).
+    - search (string): Pencarian berdasarkan nama event kejuaraan ("event_kejuaraan", case-insensitive).
+
+* POST /api/prestasi
+  - Deskripsi: Menambahkan data prestasi atlet baru.
+  - Request Body (JSON):
+    {
+      "atlet_id": number (wajib),
+      "event_kejuaraan": "string" (wajib),
+      "tanggal": "string" (wajib, format: YYYY-MM-DD),
+      "tingkat_lomba": "string" (wajib, nilai: "Daerah" | "Nasional" | "Internasional"),
+      "mendali": "string" (wajib, nilai: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali")
+    }
+
+* GET /api/prestasi/[id]
+  - Deskripsi: Mengambil detail data prestasi berdasarkan ID.
+
+* PUT /api/prestasi/[id]
+  - Deskripsi: Memperbarui data prestasi tertentu berdasarkan ID.
+  - Request Body (JSON, Parsial/Opsional):
+    {
+      "atlet_id": number,
+      "event_kejuaraan": "string",
+      "tanggal": "string",
+      "tingkat_lomba": "string",
+      "mendali": "string"
+    }
+
+* DELETE /api/prestasi/[id]
+  - Deskripsi: Menghapus data prestasi berdasarkan ID.
+
+
+--------------------------------------------------------------------------------
+5. DASHBOARD (Endpoint: /api/dashboard)
+--------------------------------------------------------------------------------
+* GET /api/dashboard
+  - Deskripsi: Mengambil ringkasan statistik data untuk UI Dashboard.
+  - Response Data:
+    {
+      "status": "success",
+      "message": "data dashboard berhasil diambil",
+      "data": {
+        "totalAtlet": number,
+        "totalCabor": number,
+        "totalPrestasi": number,
+        "totalKepengurusan": number,
+        "medalsByRegion": Array (Berisi total medali per kabupaten_kota)
+      }
+    }
+================================================================================
