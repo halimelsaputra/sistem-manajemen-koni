@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   X,
   Plus,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { FormSelect } from '@/components/ui/form-select';
@@ -57,6 +58,11 @@ export default function ManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
+
+  // Edit flow state — record SK yang sedang diedit (null = mode tambah)
+  const [editingSK, setEditingSK] = useState<KepengurusanSK | null>(null);
+  // Varian pesan sukses (dipisah dari editingSK karena editingSK di-reset sebelum alert tampil)
+  const [successIsEdit, setSuccessIsEdit] = useState(false);
 
   // Delete flow state (konfirmasi ganda + ketik frasa)
   const [deleteTarget, setDeleteTarget] = useState<KepengurusanSK | null>(null);
@@ -135,14 +141,10 @@ export default function ManagementPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSaveSK = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nomorSk || !ketuaUmum || !sekretaris) {
       alert('Mohon lengkapi Nomor SK, Ketua Umum, dan Sekretaris.');
-      return;
-    }
-    if (!selectedFile) {
-      alert('Berkas PDF SK wajib diunggah.');
       return;
     }
 
@@ -153,20 +155,28 @@ export default function ManagementPage() {
     }
 
     try {
-      // 1) Upload berkas PDF ke Supabase Storage (backend) → dapat path
-      const uploadForm = new FormData();
-      uploadForm.append('file', selectedFile);
-      const uploadRes = await fetch('/api/kepengurusan/upload', {
-        method: 'POST',
-        body: uploadForm
-      });
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok || !uploadData.data?.path) {
-        alert(uploadData.message || 'Gagal mengunggah berkas PDF.');
+      // 1) Upload berkas PDF baru jika dipilih (mode edit: opsional —
+      //    tanpa file baru, berkas lama di storage tetap dipertahankan)
+      let filePath = editingSK?.file_path_sk || '';
+      if (selectedFile) {
+        const uploadForm = new FormData();
+        uploadForm.append('file', selectedFile);
+        const uploadRes = await fetch('/api/kepengurusan/upload', {
+          method: 'POST',
+          body: uploadForm
+        });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok || !uploadData.data?.path) {
+          alert(uploadData.message || 'Gagal mengunggah berkas PDF.');
+          return;
+        }
+        filePath = uploadData.data.path;
+      } else if (!editingSK) {
+        alert('Berkas PDF SK wajib diunggah.');
         return;
       }
 
-      // 2) Simpan data SK beserta path file di storage
+      // 2) Simpan/perbarui data SK beserta path file di storage
       const payload = {
         cabor_id: selectedCabor.id,
         masa_bakti: masaBakti,
@@ -175,21 +185,31 @@ export default function ManagementPage() {
         ketua_umum: ketuaUmum,
         ketua_harian: ketuaHarian || undefined,
         sekretaris: sekretaris,
-        status_kepengurusan: 'Aktif',
-        file_path_sk: uploadData.data.path
+        status_kepengurusan: editingSK?.status_kepengurusan || 'Aktif',
+        file_path_sk: filePath
       };
 
-      const res = await fetch('/api/kepengurusan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const res = editingSK
+        ? await fetch(`/api/kepengurusan/${editingSK.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+        : await fetch('/api/kepengurusan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
       if (res.ok) {
+        const wasEdit = !!editingSK;
         setNomorSk('');
         setKetuaUmum('');
         setKetuaHarian('');
         setSekretaris('');
+        setMasaBakti('');
         setSelectedFile(null);
+        setEditingSK(null);
+        setSuccessIsEdit(wasEdit);
         setShowInputModal(false);
         setShowSuccessAlert(true);
         setTimeout(() => setShowSuccessAlert(false), 4500);
@@ -201,6 +221,35 @@ export default function ManagementPage() {
       console.error(err);
       alert('Terjadi kesalahan koneksi');
     }
+  };
+
+  // Buka modal tambah SK (mode tambah + reset form)
+  const openAddSKModal = () => {
+    setEditingSK(null);
+    setSuccessIsEdit(false);
+    setMasaBakti('');
+    setNomorSk('');
+    setTanggalSk(new Date().toISOString().split('T')[0]);
+    setKetuaUmum('');
+    setKetuaHarian('');
+    setSekretaris('');
+    setSelectedFile(null);
+    setShowInputModal(true);
+  };
+
+  // Buka modal edit SK (form diisi data lama)
+  const openEditSK = (sk: KepengurusanSK) => {
+    setEditingSK(sk);
+    const cn = caborList.find(c => c.id === sk.cabor_id)?.nama_cabor;
+    setCabor(cn || caborList[0]?.nama_cabor || '');
+    setMasaBakti(sk.masa_bakti || '');
+    setNomorSk(sk.nomor_sk || '');
+    setTanggalSk((sk.tanggal_sk || new Date().toISOString().split('T')[0]).slice(0, 10));
+    setKetuaUmum(sk.ketua_umum || '');
+    setKetuaHarian(sk.ketua_harian || '');
+    setSekretaris(sk.sekretaris || '');
+    setSelectedFile(null);
+    setShowInputModal(true);
   };
 
   const openDeleteModal = (sk: KepengurusanSK) => {
@@ -261,7 +310,13 @@ export default function ManagementPage() {
           <div className="flex items-center space-x-3">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <div className="text-sm">
-              <span className="font-bold">SK Baru Berhasil Diunggah!</span> Sistem otomatis memutasi status periode lama menjadi <span className="underline">Berakhir</span> dan mengaktifkan SK terbaru.
+              {successIsEdit ? (
+                <span className="font-bold">Perubahan SK Berhasil Disimpan!</span>
+              ) : (
+                <>
+                  <span className="font-bold">SK Baru Berhasil Diunggah!</span> Sistem otomatis memutasi status periode lama menjadi <span className="underline">Berakhir</span> dan mengaktifkan SK terbaru.
+                </>
+              )}
             </div>
           </div>
           <button onClick={() => setShowSuccessAlert(false)} className="text-emerald-600 hover:text-emerald-900">
@@ -293,7 +348,7 @@ export default function ManagementPage() {
               </span>
             </div>
             <button
-              onClick={() => setShowInputModal(true)}
+              onClick={openAddSKModal}
               className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
             >
               <Plus className="w-4 h-4" />
@@ -358,6 +413,13 @@ export default function ManagementPage() {
                     <td className="py-3.5 px-6 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
+                          onClick={() => openEditSK(sk)}
+                          title="Edit SK"
+                          className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleDownloadSignedUrl(sk)}
                           disabled={!sk.file_path_sk}
                           title={sk.file_path_sk ? 'Unduh via Secure Signed URL (5 menit)' : 'SK ini belum memiliki berkas dokumen'}
@@ -410,17 +472,17 @@ export default function ManagementPage() {
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
             <div className="bg-white text-gray-900 border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2">
-                <h3 className="font-bold text-base">Registrasi SK Kepengurusan Baru</h3>
+                <h3 className="font-bold text-base">{editingSK ? 'Edit SK Kepengurusan' : 'Registrasi SK Kepengurusan Baru'}</h3>
               </div>
               <button
-                onClick={() => setShowInputModal(false)}
+                onClick={() => { setShowInputModal(false); setEditingSK(null); }}
                 className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto">
+            <form onSubmit={handleSaveSK} className="p-6 space-y-6 overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <FormSelect
@@ -513,7 +575,7 @@ export default function ManagementPage() {
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Berkas Asli PDF SK <span className="text-red-500">*</span>
+                  Berkas Asli PDF SK {editingSK ? <span className="text-amber-600">(opsional — kosongkan untuk mempertahankan berkas saat ini)</span> : <span className="text-red-500">*</span>}
                 </label>
                 <div className="border-2 border-dashed border-gray-300 hover:border-[#b91c1c] rounded-2xl p-8 text-center bg-slate-50/50 hover:bg-red-50/20 transition cursor-pointer relative group">
                   <input
@@ -529,6 +591,16 @@ export default function ManagementPage() {
                     <div>
                       <div className="font-bold text-sm text-gray-900">{selectedFile.name}</div>
                       <div className="text-xs text-emerald-600 font-semibold mt-1">Siap untuk dienkripsi & disimpan ke server</div>
+                    </div>
+                  ) : editingSK && editingSK.file_path_sk ? (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">
+                        Berkas saat ini tersimpan —{' '}
+                        <span className="text-[#b91c1c] font-bold">klik untuk mengganti</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {editingSK.file_path_sk.split('/').pop()} (File PDF via Secure Signed URL, Max 5MB)
+                      </div>
                     </div>
                   ) : (
                     <div>
@@ -547,7 +619,7 @@ export default function ManagementPage() {
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex flex-wrap justify-end gap-2 shrink-0">
               <button
                 type="button"
-                onClick={() => setShowInputModal(false)}
+                onClick={() => { setShowInputModal(false); setEditingSK(null); }}
                 className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
               >
                 Batal
@@ -557,7 +629,7 @@ export default function ManagementPage() {
                 className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
               >
                 <Save className="w-4 h-4" />
-                <span>Simpan & Otomatisasi Status</span>
+                <span>{editingSK ? 'Simpan Perubahan' : 'Simpan & Otomatisasi Status'}</span>
               </button>
             </div>
           </div>

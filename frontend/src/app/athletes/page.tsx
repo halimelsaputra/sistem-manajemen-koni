@@ -10,7 +10,8 @@ import {
   X,
   CheckCircle2,
   UserPlus,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { MOCK_REGIONS } from '@/data/mockData';
 import { Card } from '@/components/ui/card';
@@ -89,6 +90,11 @@ export default function AthletesPage() {
   const [showInputModal, setShowInputModal] = useState(false);
   const [showAtletModal, setShowAtletModal] = useState(false);
   const [showCaborModal, setShowCaborModal] = useState(false);
+
+  // Edit flow state — menyimpan record yang sedang diedit (null = mode tambah)
+  const [editingPrestasi, setEditingPrestasi] = useState<Prestasi | null>(null);
+  const [editingAtlet, setEditingAtlet] = useState<Atlet | null>(null);
+  const [editingCabor, setEditingCabor] = useState<Cabor | null>(null);
 
   // Delete flow state (konfirmasi ganda + ketik frasa)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -180,7 +186,7 @@ export default function AthletesPage() {
     fetchAtlet();
   }, []);
 
-  const handleAddPrestasi = async (e: React.FormEvent) => {
+  const handleSavePrestasi = async (e: React.FormEvent) => {
     e.preventDefault();
     const atlet = atletList.find(a => a.nama_atlet === selectedAtletName);
     if (!atlet) return alert('Silakan pilih atlet.');
@@ -196,13 +202,20 @@ export default function AthletesPage() {
     };
 
     try {
-      const res = await fetch('/api/prestasi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const res = editingPrestasi
+        ? await fetch(`/api/prestasi/${editingPrestasi.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+        : await fetch('/api/prestasi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
       if (res.ok) {
         setEvent('');
+        setEditingPrestasi(null);
         setShowInputModal(false);
         setShowSuccessAlert(true);
         setTimeout(() => setShowSuccessAlert(false), 4000);
@@ -216,22 +229,51 @@ export default function AthletesPage() {
     }
   };
 
-  const handleAddCabor = async (e: React.FormEvent) => {
+  // Buka modal tambah prestasi (reset form + mode tambah)
+  const openAddPrestasiModal = () => {
+    setEditingPrestasi(null);
+    setEvent('');
+    setTanggal('');
+    setTingkat('Daerah');
+    setMedali('Emas');
+    setShowInputModal(true);
+  };
+
+  // Buka modal edit prestasi (form diisi data lama)
+  const openEditPrestasi = (p: Prestasi) => {
+    setEditingPrestasi(p);
+    const details = getAtletDetails(p.atlet_id, p.atlet);
+    setSelectedAtletName(details.nama);
+    setEvent(p.event_kejuaraan);
+    setTanggal((p.tanggal || '').slice(0, 10));
+    setTingkat(p.tingkat_lomba);
+    setMedali(p.mendali);
+    setShowInputModal(true);
+  };
+
+  const handleSaveCabor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCaborNama) return alert('Nama cabor harus diisi.');
 
     try {
-      const res = await fetch('/api/cabor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nama_cabor: newCaborNama })
-      });
+      const res = editingCabor
+        ? await fetch(`/api/cabor/${editingCabor.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nama_cabor: newCaborNama })
+          })
+        : await fetch('/api/cabor', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nama_cabor: newCaborNama })
+          });
       if (res.ok) {
         setShowCaborModal(false);
         setNewCaborNama('');
+        setEditingCabor(null);
         fetchCabor();
       } else {
-        alert('Gagal menambah cabor');
+        alert('Gagal menyimpan cabor');
       }
     } catch (err) {
       console.error(err);
@@ -239,7 +281,21 @@ export default function AthletesPage() {
     }
   };
 
-  const handleAddAtlet = async (e: React.FormEvent) => {
+  // Buka modal tambah cabor (mode tambah + reset form)
+  const openAddCaborModal = () => {
+    setEditingCabor(null);
+    setNewCaborNama('');
+    setShowCaborModal(true);
+  };
+
+  // Buka modal edit cabor (form diisi nama lama)
+  const openEditCabor = (c: Cabor) => {
+    setEditingCabor(c);
+    setNewCaborNama(c.nama_cabor);
+    setShowCaborModal(true);
+  };
+
+  const handleSaveAtlet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAtletNama) return alert('Nama atlet harus diisi.');
     const selCabor = caborList.find(c => c.nama_cabor === newAtletCabor);
@@ -252,23 +308,47 @@ export default function AthletesPage() {
     };
 
     try {
-      const res = await fetch('/api/atlet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const res = editingAtlet
+        ? await fetch(`/api/atlet/${editingAtlet.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+        : await fetch('/api/atlet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
       if (res.ok) {
         setShowAtletModal(false);
         setNewAtletNama('');
+        setEditingAtlet(null);
         await fetchAtlet();
         setSelectedAtletName(newAtletNama);
       } else {
-        alert('Gagal menambah atlet');
+        alert('Gagal menyimpan atlet');
       }
     } catch (err) {
       console.error(err);
       alert('Terjadi kesalahan');
     }
+  };
+
+  // Buka modal tambah atlet (mode tambah + reset form)
+  const openAddAtletModal = () => {
+    setEditingAtlet(null);
+    setNewAtletNama('');
+    setShowAtletModal(true);
+  };
+
+  // Buka modal edit atlet (form diisi data lama)
+  const openEditAtlet = (a: Atlet) => {
+    setEditingAtlet(a);
+    setNewAtletNama(a.nama_atlet);
+    setNewAtletDaerah(a.kabupaten_kota);
+    const cn = caborList.find(c => c.id === a.cabor_id)?.nama_cabor;
+    if (cn) setNewAtletCabor(cn);
+    setShowAtletModal(true);
   };
 
   // Buka modal konfirmasi hapus. Untuk atlet/cabor, ambil dampak cascade
@@ -410,14 +490,14 @@ export default function AthletesPage() {
             </div>
             <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
               <button
-                onClick={() => setShowCaborModal(true)}
+                onClick={openAddCaborModal}
                 className="flex items-center space-x-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs py-2 px-4 rounded-xl transition shadow-sm border border-gray-200"
               >
                 <Plus className="w-4 h-4" />
                 <span>Tambah Cabor</span>
               </button>
               <button
-                onClick={() => setShowInputModal(true)}
+                onClick={openAddPrestasiModal}
                 className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
               >
                 <Plus className="w-4 h-4" />
@@ -505,19 +585,28 @@ export default function AthletesPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-6 text-right">
-                      <button
-                        onClick={() => openDeleteModal({
-                          entity: 'prestasi',
-                          id: item.id,
-                          name: item.event_kejuaraan,
-                          phrase: `hapus prestasi ${item.event_kejuaraan}`,
-                          description: `Anda akan menghapus prestasi "${item.event_kejuaraan}" milik ${details.nama} (${formatTanggal(item.tanggal)}).`
-                        })}
-                        title="Hapus prestasi"
-                        className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openEditPrestasi(item)}
+                          title="Edit prestasi"
+                          className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openDeleteModal({
+                            entity: 'prestasi',
+                            id: item.id,
+                            name: item.event_kejuaraan,
+                            phrase: `hapus prestasi ${item.event_kejuaraan}`,
+                            description: `Anda akan menghapus prestasi "${item.event_kejuaraan}" milik ${details.nama} (${formatTanggal(item.tanggal)}).`
+                          })}
+                          title="Hapus prestasi"
+                          className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -576,19 +665,28 @@ export default function AthletesPage() {
                   <td className="py-3 px-6 text-gray-600 font-medium">{a.kabupaten_kota}</td>
                   <td className="py-3 px-6 font-semibold text-gray-800">{caborName}</td>
                   <td className="py-3 px-6 text-right">
-                    <button
-                      onClick={() => openDeleteModal({
-                        entity: 'atlet',
-                        id: a.id,
-                        name: a.nama_atlet,
-                        phrase: `hapus atlet ${a.nama_atlet}`,
-                        description: `Anda akan menghapus atlet "${a.nama_atlet}" (${a.kabupaten_kota}, ${caborName}) beserta seluruh prestasinya.`
-                      })}
-                      title="Hapus atlet (cascade ke prestasi)"
-                      className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => openEditAtlet(a)}
+                        title="Edit atlet"
+                        className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => openDeleteModal({
+                          entity: 'atlet',
+                          id: a.id,
+                          name: a.nama_atlet,
+                          phrase: `hapus atlet ${a.nama_atlet}`,
+                          description: `Anda akan menghapus atlet "${a.nama_atlet}" (${a.kabupaten_kota}, ${caborName}) beserta seluruh prestasinya.`
+                        })}
+                        title="Hapus atlet (cascade ke prestasi)"
+                        className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -640,19 +738,28 @@ export default function AthletesPage() {
               <tr key={c.id} className="hover:bg-slate-50/60 transition">
                 <td className="py-3 px-6 font-bold text-gray-900">{c.nama_cabor}</td>
                 <td className="py-3 px-6 text-right">
-                  <button
-                    onClick={() => openDeleteModal({
-                      entity: 'cabor',
-                      id: c.id,
-                      name: c.nama_cabor,
-                      phrase: `hapus cabor ${c.nama_cabor}`,
-                      description: `Anda akan menghapus cabor "${c.nama_cabor}". Seluruh atlet, prestasi, dan SK yang terkait akan ikut terhapus permanen.`
-                    })}
-                    title="Hapus cabor (cascade ke atlet, prestasi & SK)"
-                    className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      onClick={() => openEditCabor(c)}
+                      title="Edit cabor"
+                      className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => openDeleteModal({
+                        entity: 'cabor',
+                        id: c.id,
+                        name: c.nama_cabor,
+                        phrase: `hapus cabor ${c.nama_cabor}`,
+                        description: `Anda akan menghapus cabor "${c.nama_cabor}". Seluruh atlet, prestasi, dan SK yang terkait akan ikut terhapus permanen.`
+                      })}
+                      title="Hapus cabor (cascade ke atlet, prestasi & SK)"
+                      className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -683,17 +790,17 @@ export default function AthletesPage() {
             <div className="bg-white text-gray-900 border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2">
                 <Trophy className="w-5 h-5 text-[#b91c1c]" />
-                <h3 className="font-bold text-base">Input Prestasi Baru</h3>
+                <h3 className="font-bold text-base">{editingPrestasi ? 'Edit Prestasi' : 'Input Prestasi Baru'}</h3>
               </div>
               <button
-                onClick={() => setShowInputModal(false)}
+                onClick={() => { setShowInputModal(false); setEditingPrestasi(null); }}
                 className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddPrestasi} className="p-6 space-y-6 overflow-y-auto">
+            <form onSubmit={handleSavePrestasi} className="p-6 space-y-6 overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="md:col-span-2 flex items-end gap-3">
                   <div className="flex-1">
@@ -712,7 +819,7 @@ export default function AthletesPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowAtletModal(true)}
+                    onClick={openAddAtletModal}
                     className="flex-shrink-0 mb-[2px] flex items-center space-x-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs py-3 px-4 rounded-xl transition shadow-sm border border-gray-200"
                   >
                     <UserPlus className="w-4 h-4" />
@@ -768,18 +875,18 @@ export default function AthletesPage() {
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-3 shrink-0">
               <button
                 type="button"
-                onClick={() => setShowInputModal(false)}
+                onClick={() => { setShowInputModal(false); setEditingPrestasi(null); }}
                 className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
               >
                 Batal
               </button>
               <button
                 type="button"
-                onClick={handleAddPrestasi}
+                onClick={handleSavePrestasi}
                 className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
               >
                 <Save className="w-4 h-4" />
-                <span>Simpan Prestasi</span>
+                <span>{editingPrestasi ? 'Simpan Perubahan' : 'Simpan Prestasi'}</span>
               </button>
             </div>
           </div>
@@ -794,17 +901,17 @@ export default function AthletesPage() {
             <div className="bg-white text-gray-900 border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2">
                 <Plus className="w-5 h-5 text-[#b91c1c]" />
-                <h3 className="font-bold text-base">Tambah Cabang Olahraga</h3>
+                <h3 className="font-bold text-base">{editingCabor ? 'Edit Cabang Olahraga' : 'Tambah Cabang Olahraga'}</h3>
               </div>
               <button
-                onClick={() => setShowCaborModal(false)}
+                onClick={() => { setShowCaborModal(false); setEditingCabor(null); }}
                 className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddCabor} className="p-6 space-y-5">
+            <form onSubmit={handleSaveCabor} className="p-6 space-y-5">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                   Nama Cabang Olahraga <span className="text-red-500">*</span>
@@ -822,18 +929,18 @@ export default function AthletesPage() {
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setShowCaborModal(false)}
+                onClick={() => { setShowCaborModal(false); setEditingCabor(null); }}
                 className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
               >
                 Batal
               </button>
               <button
                 type="button"
-                onClick={handleAddCabor}
+                onClick={handleSaveCabor}
                 className="flex items-center space-x-2 bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
               >
                 <Save className="w-4 h-4" />
-                <span>Simpan Cabor</span>
+                <span>{editingCabor ? 'Simpan Perubahan' : 'Simpan Cabor'}</span>
               </button>
             </div>
           </div>
@@ -848,17 +955,17 @@ export default function AthletesPage() {
             <div className="bg-white text-gray-900 border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2">
                 <UserPlus className="w-5 h-5 text-[#b91c1c]" />
-                <h3 className="font-bold text-base">Registrasi Atlet Baru</h3>
+                <h3 className="font-bold text-base">{editingAtlet ? 'Edit Data Atlet' : 'Registrasi Atlet Baru'}</h3>
               </div>
               <button
-                onClick={() => setShowAtletModal(false)}
+                onClick={() => { setShowAtletModal(false); setEditingAtlet(null); }}
                 className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddAtlet} className="p-6 space-y-5">
+            <form onSubmit={handleSaveAtlet} className="p-6 space-y-5">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                   Nama Lengkap <span className="text-red-500">*</span>
@@ -894,18 +1001,18 @@ export default function AthletesPage() {
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setShowAtletModal(false)}
+                onClick={() => { setShowAtletModal(false); setEditingAtlet(null); }}
                 className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
               >
                 Batal
               </button>
               <button
                 type="button"
-                onClick={handleAddAtlet}
+                onClick={handleSaveAtlet}
                 className="flex items-center space-x-2 bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
               >
                 <Save className="w-4 h-4" />
-                <span>Daftarkan Atlet</span>
+                <span>{editingAtlet ? 'Simpan Perubahan' : 'Daftarkan Atlet'}</span>
               </button>
             </div>
           </div>
