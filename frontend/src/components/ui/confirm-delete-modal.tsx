@@ -90,14 +90,14 @@ export default function ConfirmDeleteModal({
               <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
 
               {impact.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <div className="text-xs font-extrabold text-amber-800 uppercase tracking-wider mb-2">
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="text-xs font-extrabold text-red-700 uppercase tracking-wider mb-2">
                     Data berikut akan ikut terhapus permanen
                   </div>
                   <ul className="space-y-1.5">
                     {impact.map((item, i) => (
-                      <li key={i} className="flex items-center space-x-2 text-sm font-semibold text-amber-900">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <li key={i} className="flex items-center space-x-2 text-sm font-semibold text-red-900">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
                         <span>{item}</span>
                       </li>
                     ))}
@@ -115,11 +115,11 @@ export default function ConfirmDeleteModal({
               <p className="text-sm text-gray-600 leading-relaxed">
                 Konfirmasi terakhir: ketik teks berikut untuk menghapus secara permanen.
               </p>
-              <div className="bg-gray-900 text-emerald-400 font-mono text-sm font-semibold rounded-xl px-4 py-3 text-center select-all">
-                {confirmPhrase}
-              </div>
+              <p className="text-gray-900 font-semibold text-sm text-center select-all">
+                &ldquo;{confirmPhrase}&rdquo;
+              </p>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-medium text-gray-700 uppercase tracking-wider mb-2">
                   Ketik frasa di atas
                 </label>
                 <input
