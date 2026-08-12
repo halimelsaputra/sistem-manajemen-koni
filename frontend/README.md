@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SI-KONI Aceh — Sistem Manajemen Keolahragaan
 
-## Getting Started
+Sistem manajemen data atlet, prestasi, cabang olahraga, dan kepengurusan (SK) KONI Aceh.
 
-First, run the development server:
+---
+
+## 🔐 Akun Admin
+
+### Super Admin
+Login super admin menggunakan kredensial yang dikonfigurasi di **env backend** (`ADMIN_USERNAME` / `ADMIN_PASSWORD`).
+
+### Admin Wilayah (23 kabupaten/kota)
+
+Password default untuk **semua** akun: **`koni2024`**
+
+> ⚠️ **Wajib diganti setelah login pertama** melalui menu **Ubah Kata Sandi** di sidebar. Jangan gunakan password default di produksi.
+
+| # | Wilayah | Username |
+|---|---|---|
+| 1 | Banda Aceh | `admin.banda-aceh` |
+| 2 | Aceh Besar | `admin.aceh-besar` |
+| 3 | Pidie | `admin.pidie` |
+| 4 | Lhokseumawe | `admin.lhokseumawe` |
+| 5 | Aceh Timur | `admin.aceh-timur` |
+| 6 | Bireuen | `admin.bireuen` |
+| 7 | Aceh Utara | `admin.aceh-utara` |
+| 8 | Langsa | `admin.langsa` |
+| 9 | Aceh Barat | `admin.aceh-barat` |
+| 10 | Aceh Tengah | `admin.aceh-tengah` |
+| 11 | Sabang | `admin.sabang` |
+| 12 | Aceh Jaya | `admin.aceh-jaya` |
+| 13 | Pidie Jaya | `admin.pidie-jaya` |
+| 14 | Aceh Tamiang | `admin.aceh-tamiang` |
+| 15 | Aceh Selatan | `admin.aceh-selatan` |
+| 16 | Subulussalam | `admin.subulussalam` |
+| 17 | Bener Meriah | `admin.bener-meriah` |
+| 18 | Nagan Raya | `admin.nagan-raya` |
+| 19 | Gayo Lues | `admin.gayo-lues` |
+| 20 | Aceh Tenggara | `admin.aceh-tenggara` |
+| 21 | Simeulue | `admin.simeulue` |
+| 22 | Aceh Singkil | `admin.aceh-singkil` |
+| 23 | Aceh Barat Daya | `admin.aceh-barat-daya` |
+
+---
+
+## 📋 Daftar Hak Akses
+
+| Fitur | Super Admin | Admin Wilayah |
+|---|---|---|
+| Atlet & Prestasi | Semua wilayah | Hanya wilayahnya sendiri |
+| Dashboard | Peta seluruh Aceh | Ringkasan wilayahnya (tanpa peta) |
+| Cabor & Cabang Cabor | Kelola penuh | Baca saja |
+| Kepengurusan / SK | Kelola penuh | Tidak ada akses |
+| Ubah Kata Sandi | Via env backend | Menu Pengaturan |
+
+---
+
+## 🚀 Menjalankan di Lokal
 
 ```bash
+# Backend (port 3001)
+cd backend
+cp .env.example .env   # isi sesuai lingkungan
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Frontend (port 3000)
+cd frontend
+cp .env.example .env   # isi AUTH_SECRET sama dengan backend
+npm install
+npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Buka [http://localhost:3000](http://localhost:3000).
