@@ -39,7 +39,13 @@ export const DashboardRepository = {
      */
     async countPrestasi(region?: string) {
         let query = supabase.from("prestasi").select("*", { count: "exact", head: true });
-        if (region) query = query.eq("atlet.kabupaten_kota", region);
+        if (region) {
+            // Filter kolom relasi memerlukan inner join (atlet!inner) agar berlaku.
+            query = supabase
+                .from("prestasi")
+                .select("id, atlet!inner(kabupaten_kota)", { count: "exact", head: true })
+                .eq("atlet.kabupaten_kota", region);
+        }
 
         const { count, error } = await query;
 
@@ -71,7 +77,13 @@ export const DashboardRepository = {
      */
     async getMedalsByRegion(region?: string) {
         let query = supabase.from("prestasi").select("mendali, atlet(kabupaten_kota)");
-        if (region) query = query.eq("atlet.kabupaten_kota", region);
+        if (region) {
+            // Inner join diperlukan agar filter relasi atlet.kabupaten_kota benar-benar diterapkan.
+            query = supabase
+                .from("prestasi")
+                .select("mendali, atlet!inner(kabupaten_kota)")
+                .eq("atlet.kabupaten_kota", region);
+        }
 
         const { data, error } = await query;
 
