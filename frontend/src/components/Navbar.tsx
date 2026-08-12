@@ -7,9 +7,25 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 
-const menuItems = [
+type MenuItem = {
+  icon: typeof LayoutDashboard;
+  label: string;
+  href: string;
+  children?: { label: string; href: string }[];
+}
+
+const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
-  { icon: Trophy, label: 'Direktori Prestasi', href: '/athletes' },
+  {
+    icon: Trophy,
+    label: 'Direktori Prestasi',
+    href: '/athletes',
+    children: [
+      { label: 'Manajemen Prestasi', href: '/athletes' },
+      { label: 'Manajemen Atlet', href: '/athletes/atlet' },
+      { label: 'Manajemen Cabor', href: '/athletes/cabor' },
+    ],
+  },
   { icon: Home, label: 'Kepengurusan', href: '/management' },
 ]
 
@@ -154,24 +170,51 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
             <nav className="space-y-0.5">
               {menuItems.map((item) => {
                 const isActive = pathname === item.href
+                const children = item.children
+                const isChildActive = children?.some((c) => pathname === c.href)
+                // Submenu hanya tampil saat berada di halaman itu — otomatis tertutup saat pindah halaman
+                const showSubmenu = !!children && sidebarOpen && (isActive || isChildActive)
                 return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-200',
-                      isActive
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+                  <div key={item.label}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+                        isActive || isChildActive
+                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+                      )}
+                    >
+                      <item.icon className="w-4 h-4 shrink-0" />
+                      <span className={cn(
+                        "text-sm whitespace-nowrap transition-opacity duration-300",
+                        sidebarOpen ? "opacity-100" : "opacity-0"
+                      )}>{item.label}</span>
+                    </Link>
+                    {children && showSubmenu && (
+                      <div className="ml-7 mt-0.5 space-y-0.5 border-l-2 border-gray-100 pl-1">
+                        {children.map((child) => {
+                          const childActive = pathname === child.href
+                          return (
+                            <Link
+                              key={child.href}
+                              href={child.href}
+                              onClick={() => setMobileOpen(false)}
+                              className={cn(
+                                'block px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200',
+                                childActive
+                                  ? 'font-bold text-[#b91c1c] bg-red-50'
+                                  : 'font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+                              )}
+                            >
+                              {child.label}
+                            </Link>
+                          )
+                        })}
+                      </div>
                     )}
-                  >
-                    <item.icon className="w-4 h-4 shrink-0" />
-                    <span className={cn(
-                      "text-sm whitespace-nowrap transition-opacity duration-300",
-                      sidebarOpen ? "opacity-100" : "opacity-0"
-                    )}>{item.label}</span>
-                  </Link>
+                  </div>
                 )
               })}
             </nav>

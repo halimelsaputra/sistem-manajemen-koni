@@ -143,7 +143,7 @@ export default function ConfirmDeleteModal({
             type="button"
             onClick={step === 1 ? onClose : () => setStep(1)}
             disabled={loading}
-            className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition disabled:opacity-40"
+            className="px-7 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-sm rounded-xl transition disabled:opacity-40"
           >
             {step === 1 ? 'Batal' : 'Kembali'}
           </button>
