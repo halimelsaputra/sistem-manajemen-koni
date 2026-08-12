@@ -89,7 +89,7 @@ export const CaborRepository = {
      */
     async countDependencies(caborId: string) {
         // prestasi dihitung lewat join atlet (atlet!inner) agar deterministik
-        const [atletRes, prestasiRes, kepengurusanRes] = await Promise.all([
+        const [atletRes, prestasiRes, kepengurusanRes, cabangRes] = await Promise.all([
             supabase
                 .from("atlet")
                 .select("id", { count: "exact", head: true })
@@ -102,9 +102,13 @@ export const CaborRepository = {
                 .from("kepengurusan")
                 .select("id", { count: "exact", head: true })
                 .eq("cabor_id", caborId),
+            supabase
+                .from("cabang_cabor")
+                .select("id", { count: "exact", head: true })
+                .eq("cabor_id", caborId),
         ]);
 
-        for (const res of [atletRes, prestasiRes, kepengurusanRes]) {
+        for (const res of [atletRes, prestasiRes, kepengurusanRes, cabangRes]) {
             if (res.error) {
                 console.error("Gagal menghitung dependensi cabor:", res.error.message);
                 throw res.error;
@@ -115,6 +119,7 @@ export const CaborRepository = {
             atlet: atletRes.count ?? 0,
             prestasi: prestasiRes.count ?? 0,
             kepengurusan: kepengurusanRes.count ?? 0,
+            cabang: cabangRes.count ?? 0,
         };
     },
 
@@ -198,7 +203,18 @@ export const CaborRepository = {
             }
         }
 
-        // 3) Cabor itu sendiri
+        // 3) Hitung cabang cabor yang akan ikut terhapus (FK on delete cascade)
+        const { count: cabangCount, error: cabangCountErr } = await supabase
+            .from("cabang_cabor")
+            .select("id", { count: "exact", head: true })
+            .eq("cabor_id", id);
+        if (cabangCountErr) {
+            console.error(`Gagal menghitung cabang cabor ${id}:`, cabangCountErr.message);
+            throw cabangCountErr;
+        }
+
+        // 4) Cabor itu sendiri (cabang_cabor ikut terhapus otomatis via FK cascade;
+        //    prestasi yang mereferensi cabang di-set null via FK on delete set null)
         const { data: deleted, error } = await supabase
             .from("cabor")
             .delete()
@@ -218,6 +234,7 @@ export const CaborRepository = {
                 atlet: atletIds.length,
                 prestasi: prestasiCount,
                 kepengurusan: kepIds.length,
+                cabang: cabangCount ?? 0,
             },
         };
     }

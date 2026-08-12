@@ -22,7 +22,8 @@ export const PrestasiRepository = {
     ) {
         // atlet!inner: join inner agar filter pada kolom relasi (cabor_id, kabupaten_kota) deterministik.
         // Aman karena atlet_id adalah FK NOT NULL — tidak ada baris prestasi tanpa atlet.
-        const selectStr = "*, atlet!inner(nama_atlet, kabupaten_kota, cabor(nama_cabor))";
+        // cabang_cabor: join opsional untuk menampilkan nama cabang cabor (mis. "Renang 200 meter").
+        const selectStr = "*, atlet!inner(nama_atlet, kabupaten_kota, cabor(nama_cabor)), cabang_cabor(nama_cabang)";
         let query = pagination
             ? supabase.from("prestasi").select(selectStr, { count: "exact" })
             : supabase.from("prestasi").select(selectStr);
@@ -104,7 +105,7 @@ export const PrestasiRepository = {
         // agar route bisa membedakan 404 vs error server.
         const { data, error } = await supabase
             .from("prestasi")
-            .select("*, atlet(nama_atlet, kabupaten_kota, cabor(nama_cabor))")
+            .select("*, atlet(nama_atlet, kabupaten_kota, cabor(nama_cabor)), cabang_cabor(nama_cabang)")
             .eq("id", id)
             .maybeSingle();
 
@@ -125,11 +126,12 @@ export const PrestasiRepository = {
         tanggal: string;
         tingkat_lomba: "Daerah" | "Nasional" | "Internasional";
         mendali: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali";
+        cabang_cabor_id?: number | null;
     }) {
         const { data: newPrestasi, error } = await supabase
             .from("prestasi")
             .insert([data])
-            .select("*, atlet(nama_atlet, kabupaten_kota, cabor(nama_cabor))")
+            .select("*, atlet(nama_atlet, kabupaten_kota, cabor(nama_cabor)), cabang_cabor(nama_cabang)")
             .single();
 
         if (error) {
@@ -152,13 +154,14 @@ export const PrestasiRepository = {
             tanggal: string;
             tingkat_lomba: "Daerah" | "Nasional" | "Internasional";
             mendali: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali";
+            cabang_cabor_id?: number | null;
         }>
     ) {
         const { data: updatedPrestasi, error } = await supabase
             .from("prestasi")
             .update(data)
             .eq("id", id)
-            .select("*, atlet(nama_atlet, kabupaten_kota, cabor(nama_cabor))")
+            .select("*, atlet(nama_atlet, kabupaten_kota, cabor(nama_cabor)), cabang_cabor(nama_cabang)")
             .single();
 
         if (error) {

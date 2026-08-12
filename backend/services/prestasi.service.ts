@@ -41,6 +41,7 @@ export const PrestasiService = {
         tanggal: string;
         tingkat_lomba: "Daerah" | "Nasional" | "Internasional";
         mendali: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali";
+        cabang_cabor_id?: number | null;
     }) {
         // Validasi parameter wajib
         if (!data.atlet_id || !data.event_kejuaraan || !data.tanggal || !data.tingkat_lomba || !data.mendali) {
@@ -64,7 +65,8 @@ export const PrestasiService = {
             event_kejuaraan: data.event_kejuaraan.trim(),
             tanggal: data.tanggal,
             tingkat_lomba: data.tingkat_lomba,
-            mendali: data.mendali
+            mendali: data.mendali,
+            cabang_cabor_id: data.cabang_cabor_id ?? null
         });
     },
 
@@ -81,6 +83,7 @@ export const PrestasiService = {
             tanggal: string;
             tingkat_lomba: "Daerah" | "Nasional" | "Internasional";
             mendali: "Emas" | "Perak" | "Perunggu" | "Tanpa Medali";
+            cabang_cabor_id?: number | null;
         }>
     ) {
         // Validasi parsial jika diinputkan

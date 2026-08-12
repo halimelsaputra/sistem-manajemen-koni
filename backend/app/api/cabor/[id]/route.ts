@@ -139,11 +139,12 @@ export async function DELETE(
             );
         }
 
-        const { atlet, prestasi, kepengurusan } = result.cascade ?? {};
+        const { atlet, prestasi, kepengurusan, cabang } = result.cascade ?? {};
         const parts: string[] = [];
         if (kepengurusan) parts.push(`${kepengurusan} SK`);
         if (atlet) parts.push(`${atlet} atlet`);
         if (prestasi) parts.push(`${prestasi} prestasi`);
+        if (cabang) parts.push(`${cabang} cabang cabor`);
 
         return NextResponse.json(
             {
