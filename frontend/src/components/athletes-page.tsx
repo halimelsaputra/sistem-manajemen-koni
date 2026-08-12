@@ -77,21 +77,6 @@ const formatTanggal = (t?: string): string => {
 
 type AthletesSection = 'prestasi' | 'atlet' | 'cabor';
 
-const SECTION_META: Record<AthletesSection, { title: string; desc: string }> = {
-  prestasi: {
-    title: 'Manajemen Prestasi',
-    desc: 'Kelola pencapaian atlet regional secara terstruktur dan terukur.',
-  },
-  atlet: {
-    title: 'Manajemen Atlet',
-    desc: 'Kelola data atlet beserta cabang olahraga dan asal daerahnya.',
-  },
-  cabor: {
-    title: 'Manajemen Cabor',
-    desc: 'Kelola cabang olahraga beserta cabang-cabang yang dimilikinya.',
-  },
-};
-
 export default function AthletesPage({ section = 'prestasi' }: { section?: AthletesSection }) {
   const [prestasiList, setPrestasiList] = useState<Prestasi[]>([]);
   const [atletList, setAtletList] = useState<Atlet[]>([]);
@@ -165,6 +150,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
   const [atletSearch, setAtletSearch] = useState('');
   const [atletFilterCabor, setAtletFilterCabor] = useState('Semua Cabor');
   const [atletFilterDaerah, setAtletFilterDaerah] = useState('Semua Daerah');
+  const [caborSearch, setCaborSearch] = useState('');
 
   // Penjaga race condition: respons basi dari request lama diabaikan
   const requestSeq = useRef(0);
@@ -723,17 +709,23 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
   const atletSafePage = Math.min(atletPage, atletMaxPage);
   const atletPageItems = filteredAtletList.slice((atletSafePage - 1) * PAGE_SIZE, atletSafePage * PAGE_SIZE);
 
-  // Cabor diurutkan abjad saat fetch; langsung dipakai tanpa filter
-  const caborMaxPage = Math.max(1, Math.ceil(caborList.length / PAGE_SIZE));
+  // Cabor diurutkan abjad saat fetch; filter search client-side (nama cabor)
+  const filteredCaborList = caborList.filter(c => {
+    const q = caborSearch.trim().toLowerCase();
+    return !q || c.nama_cabor.toLowerCase().includes(q);
+  });
+  const caborMaxPage = Math.max(1, Math.ceil(filteredCaborList.length / PAGE_SIZE));
   const caborSafePage = Math.min(caborPage, caborMaxPage);
-  const caborPageItems = caborList.slice((caborSafePage - 1) * PAGE_SIZE, caborSafePage * PAGE_SIZE);
+  const caborPageItems = filteredCaborList.slice((caborSafePage - 1) * PAGE_SIZE, caborSafePage * PAGE_SIZE);
 
   return (
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">{SECTION_META[section].title}</h1>
-        <p className="text-sm text-gray-500 mt-1">{SECTION_META[section].desc}</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Direktori Prestasi</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Manajemen pencapaian atlet, data atlet, dan cabang olahraga secara terpusat.
+        </p>
       </div>
 
       {showSuccessAlert && (
@@ -764,7 +756,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
       {section === 'prestasi' && (
       <Card className="rounded-2xl overflow-hidden py-0 flex flex-col min-h-[780px]">
         <div className="px-6 py-4 border-b border-gray-100 space-y-3 shrink-0">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 items-start sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center space-x-3">
               <h2 className="text-lg font-bold text-gray-900">Database Prestasi Regional</h2>
               <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
@@ -915,7 +907,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
       {section === 'atlet' && (
       <Card className="rounded-2xl overflow-hidden py-0">
         <div className="px-6 py-4 border-b border-gray-100 space-y-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 items-start sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center space-x-3">
               <h2 className="text-lg font-bold text-gray-900">Manajemen Data Atlet</h2>
               <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
@@ -1037,7 +1029,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
       {section === 'cabor' && (
       <Card className="rounded-2xl overflow-hidden py-0">
         <div className="px-6 py-4 border-b border-gray-100 space-y-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 items-start sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center space-x-3">
               <h2 className="text-lg font-bold text-gray-900">Manajemen Data Cabor</h2>
               <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
@@ -1051,6 +1043,23 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               <Plus className="w-4 h-4" />
               <span>Tambah Cabor</span>
             </button>
+          </div>
+
+          {/* Search cabor — lebar tetap di kiri, tidak melebar penuh */}
+          <div className="relative w-full sm:w-56">
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+              Cari Cabor
+            </label>
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Cari nama cabor..."
+                value={caborSearch}
+                onChange={(e) => { setCaborSearch(e.target.value); setCaborPage(1); }}
+                className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+              />
+            </div>
           </div>
         </div>
 
@@ -1100,7 +1109,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
             {caborPageItems.length === 0 && (
               <tr>
                 <td colSpan={2} className="text-center py-8 text-gray-400 text-sm">
-                  Belum ada data cabor.
+                  {caborList.length === 0 ? 'Belum ada data cabor.' : 'Tidak ada data cabor yang cocok dengan pencarian.'}
                 </td>
               </tr>
             )}
@@ -1110,7 +1119,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
         <Pagination
           page={caborSafePage}
           totalPages={caborMaxPage}
-          total={caborList.length}
+          total={filteredCaborList.length}
           pageSize={PAGE_SIZE}
           noun="cabor"
           onPageChange={setCaborPage}
@@ -1138,29 +1147,19 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
 
             <form onSubmit={handleSavePrestasi} className="p-6 space-y-6 overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="md:col-span-2 flex items-end gap-3">
-                  <div className="flex-1">
-                    {atletOptions.length > 0 ? (
-                      <FormSelect
-                        label="Pilih Atlet"
-                        value={selectedAtletName}
-                        options={atletOptions}
-                        onSelect={(v) => { setSelectedAtletName(v); syncCabangAfterAtlet(v); }}
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-500 font-medium pb-2 border-b">
-                        Belum ada data atlet. Silakan tambah atlet baru.
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={openAddAtletModal}
-                    className="flex-shrink-0 mb-[2px] flex items-center space-x-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs py-3 px-4 rounded-xl transition shadow-sm border border-gray-200"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>Tambah Atlet Baru</span>
-                  </button>
+                <div className="md:col-span-2">
+                  {atletOptions.length > 0 ? (
+                    <FormSelect
+                      label="Pilih Atlet"
+                      value={selectedAtletName}
+                      options={atletOptions}
+                      onSelect={(v) => { setSelectedAtletName(v); syncCabangAfterAtlet(v); }}
+                    />
+                  ) : (
+                    <div className="text-sm text-gray-500 font-medium pb-2 border-b">
+                      Belum ada data atlet. Silakan tambah atlet baru.
+                    </div>
+                  )}
                 </div>
 
                 {selAtletObj && (
