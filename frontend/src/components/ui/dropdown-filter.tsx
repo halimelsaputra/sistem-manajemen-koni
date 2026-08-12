@@ -64,6 +64,7 @@ export function DropdownFilter({ label, value, options, onSelect }: DropdownFilt
               {options.map((option) => (
                 <button
                   key={option}
+                  type="button" // penting: tanpa ini tombol opsi menjadi submit di dalam <form>
                   onClick={() => {
                     onSelect(option);
                     setIsOpen(false);

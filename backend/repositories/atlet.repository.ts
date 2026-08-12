@@ -52,7 +52,7 @@ export const AtletRepository = {
      * Mencari data atlet tertentu berdasarkan ID beserta nama cabang olahraganya.
      * @param id ID Atlet yang dicari
      */
-    async findByid(id: string) {
+    async findById(id: string) {
         // maybeSingle: kembalikan null (bukan error) jika ID tidak ditemukan,
         // agar route bisa membedakan 404 vs error server.
         const { data, error } = await supabase

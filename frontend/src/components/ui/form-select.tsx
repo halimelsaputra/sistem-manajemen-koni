@@ -8,9 +8,11 @@ interface FormSelectProps {
   value: string;
   options: string[];
   onSelect: (value: string) => void;
+  /** Tampilkan bintang merah — menandai field wajib */
+  required?: boolean;
 }
 
-export function FormSelect({ label, value, options, onSelect }: FormSelectProps) {
+export function FormSelect({ label, value, options, onSelect, required = false }: FormSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -28,6 +30,7 @@ export function FormSelect({ label, value, options, onSelect }: FormSelectProps)
     <div ref={ref} className="relative w-full">
       <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
         {label}
+        {required && <span className="text-red-500"> *</span>}
       </label>
       {/* Trigger — form input style */}
       <div
@@ -56,6 +59,7 @@ export function FormSelect({ label, value, options, onSelect }: FormSelectProps)
               {options.map((option) => (
                 <button
                   key={option}
+                  type="button" // penting: tanpa ini tombol opsi menjadi submit di dalam <form>
                   onClick={() => {
                     onSelect(option);
                     setIsOpen(false);

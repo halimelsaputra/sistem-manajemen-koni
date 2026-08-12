@@ -1,6 +1,22 @@
 import { CaborRepository } from "@/repositories/cabor.repository";
 import { ValidationError } from "@/lib/errors";
 
+/**
+ * Memastikan nama cabor belum dipakai (case-insensitive).
+ * @param nama Nama cabor yang akan dicek
+ * @param excludeId Opsional — ID cabor yang dikecualikan (saat update dirinya sendiri)
+ */
+async function ensureNamaUnik(nama: string, excludeId?: string) {
+    const all = await CaborRepository.findAll();
+    const dup = (all ?? []).find(
+        c => String(c.nama_cabor || "").trim().toLowerCase() === nama.toLowerCase()
+            && String(c.id) !== String(excludeId)
+    );
+    if (dup) {
+        throw new ValidationError(`Cabang olahraga "${nama}" sudah terdaftar.`);
+    }
+}
+
 export const CaborService = {
     /**
      * Mendapatkan semua cabang olahraga dengan filter opsional.
@@ -26,9 +42,9 @@ export const CaborService = {
         if (!data.nama_cabor || data.nama_cabor.trim() === "") {
             throw new ValidationError("Nama cabang olahraga (nama_cabor) wajib diisi.");
         }
-        return await CaborRepository.create({
-            nama_cabor: data.nama_cabor.trim()
-        });
+        const nama = data.nama_cabor.trim();
+        await ensureNamaUnik(nama);
+        return await CaborRepository.create({ nama_cabor: nama });
     },
 
     /**
@@ -40,9 +56,9 @@ export const CaborService = {
         if (!data.nama_cabor || data.nama_cabor.trim() === "") {
             throw new ValidationError("Nama cabang olahraga (nama_cabor) wajib diisi.");
         }
-        return await CaborRepository.update(id, {
-            nama_cabor: data.nama_cabor.trim()
-        });
+        const nama = data.nama_cabor.trim();
+        await ensureNamaUnik(nama, id);
+        return await CaborRepository.update(id, { nama_cabor: nama });
     },
 
     /**

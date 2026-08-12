@@ -11,7 +11,9 @@ import {
   CheckCircle2,
   UserPlus,
   Trash2,
-  Pencil
+  Pencil,
+  Loader2,
+  Check
 } from 'lucide-react';
 import { MOCK_REGIONS } from '@/data/mockData';
 import { Card } from '@/components/ui/card';
@@ -62,6 +64,9 @@ interface DeleteTarget {
 // Jumlah rekor per halaman (dipakai di fetch & footer pagination)
 const PAGE_SIZE = 20;
 
+// Opsi penanda "belum pilih" pada dropdown cabang (cabor yang punya cabang → cabang WAJIB diisi)
+const CABANG_PLACEHOLDER = '— Pilih Cabang —';
+
 // Format tanggal DB (YYYY-MM-DD) → tampilan Indonesia (mis. 15 Jan 2024)
 const formatTanggal = (t?: string): string => {
   if (!t) return '';
@@ -97,14 +102,21 @@ export default function AthletesPage() {
   const [newCabangNama, setNewCabangNama] = useState('');
   // Cabang cabor (sub-cabang, mis. Renang → "Renang 200 meter")
   const [selectedCabang, setSelectedCabang] = useState('Tanpa Cabang');
-  const [inlineCabangNama, setInlineCabangNama] = useState('');
   // Daftar sementara cabang saat menambah cabor baru (belum punya id karena cabor belum dibuat)
   const [tempCabangNames, setTempCabangNames] = useState<string[]>([]);
+  // Edit nama cabang yang sedang berlangsung (null = tidak ada yang diedit)
+  const [editingCabangId, setEditingCabangId] = useState<number | string | null>(null);
+  const [editingCabangNama, setEditingCabangNama] = useState('');
 
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
   const [showAtletModal, setShowAtletModal] = useState(false);
   const [showCaborModal, setShowCaborModal] = useState(false);
+
+  // Loading state tombol simpan — mencegah double-submit & memberi umpan balik
+  const [caborSaving, setCaborSaving] = useState(false);
+  const [prestasiSaving, setPrestasiSaving] = useState(false);
+  const [atletSaving, setAtletSaving] = useState(false);
 
   // Edit flow state — menyimpan record yang sedang diedit (null = mode tambah)
   const [editingPrestasi, setEditingPrestasi] = useState<Prestasi | null>(null);
@@ -209,10 +221,17 @@ export default function AthletesPage() {
 
   const handleSavePrestasi = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (prestasiSaving) return; // cegah double-submit
     const atlet = atletList.find(a => a.nama_atlet === selectedAtletName);
     if (!atlet) return alert('Silakan pilih atlet.');
     if (!event) return alert('Nama event harus diisi.');
     if (!tanggal) return alert('Tanggal kejuaraan harus diisi.');
+
+    // Cabor atlet punya cabang → wajib pilih salah satu cabang
+    const atletCaborHasCabang = cabangList.some(c => c.cabor_id === atlet.cabor_id);
+    if (atletCaborHasCabang && (!selectedCabang || selectedCabang === 'Tanpa Cabang' || selectedCabang === CABANG_PLACEHOLDER)) {
+      return alert('Cabor ini memiliki cabang — silakan pilih cabang cabor.');
+    }
 
     const payload = {
       atlet_id: atlet.id,
@@ -223,6 +242,7 @@ export default function AthletesPage() {
       cabang_cabor_id: resolveCabangId()
     };
 
+    setPrestasiSaving(true);
     try {
       const res = editingPrestasi
         ? await fetch(`/api/prestasi/${editingPrestasi.id}`, {
@@ -243,11 +263,14 @@ export default function AthletesPage() {
         setTimeout(() => setShowSuccessAlert(false), 4000);
         loadPrestasi();
       } else {
-        alert('Gagal menyimpan prestasi');
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.message || 'Gagal menyimpan prestasi');
       }
     } catch (err) {
       console.error(err);
       alert('Terjadi kesalahan');
+    } finally {
+      setPrestasiSaving(false);
     }
   };
 
@@ -258,8 +281,8 @@ export default function AthletesPage() {
     setTanggal('');
     setTingkat('Daerah');
     setMedali('Emas');
-    setSelectedCabang('Tanpa Cabang');
-    setInlineCabangNama('');
+    // Atlet default sudah terpilih — sinkronkan kewajiban cabang
+    syncCabangAfterAtlet(selectedAtletName);
     setShowInputModal(true);
   };
 
@@ -272,14 +295,25 @@ export default function AthletesPage() {
     setTanggal((p.tanggal || '').slice(0, 10));
     setTingkat(p.tingkat_lomba);
     setMedali(p.mendali);
-    setSelectedCabang(p.cabang_cabor?.nama_cabang || 'Tanpa Cabang');
-    setInlineCabangNama('');
+    if (p.cabang_cabor?.nama_cabang) {
+      setSelectedCabang(p.cabang_cabor.nama_cabang);
+    } else {
+      syncCabangAfterAtlet(details.nama);
+    }
     setShowInputModal(true);
+  };
+
+  // Sinkronkan pilihan cabang setelah atlet (atau cabor) berubah:
+  // cabor bercabang → wajib pilih cabang (placeholder); tanpa cabang → "Tanpa Cabang"
+  const syncCabangAfterAtlet = (atletNama: string) => {
+    const a = atletList.find(x => x.nama_atlet === atletNama);
+    const has = a ? cabangList.some(c => c.cabor_id === a.cabor_id) : false;
+    setSelectedCabang(has ? CABANG_PLACEHOLDER : 'Tanpa Cabang');
   };
 
   // Cari id cabang dari nama yang dipilih (mengikuti cabor atlet terpilih)
   const resolveCabangId = (): number | null => {
-    if (!selectedCabang || selectedCabang === 'Tanpa Cabang') return null;
+    if (!selectedCabang || selectedCabang === 'Tanpa Cabang' || selectedCabang === CABANG_PLACEHOLDER) return null;
     const atletObj = atletList.find(a => a.nama_atlet === selectedAtletName);
     if (!atletObj) return null;
     const cab = cabangList.find(c => c.nama_cabang === selectedCabang && c.cabor_id === atletObj.cabor_id);
@@ -288,8 +322,23 @@ export default function AthletesPage() {
 
   const handleSaveCabor = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (caborSaving) return; // cegah double-submit
     if (!newCaborNama) return alert('Nama cabor harus diisi.');
+    const namaCabor = newCaborNama.trim();
+    const caborDup = caborList.find(c => c.nama_cabor.toLowerCase() === namaCabor.toLowerCase() && c.id !== editingCabor?.id);
+    if (caborDup) return alert(`Cabor "${namaCabor}" sudah terdaftar.`);
 
+    // Jaring pengaman (hanya mode tambah): cabang yang masih tertulis di input
+    // ikut disimpan — mencegah cabang hilang walau user lupa klik "Tambah".
+    // Di mode edit, cabang disimpan langsung lewat tombol "Tambah" (bukan temp).
+    const pendingNama = newCabangNama.trim();
+    const cabangToSave = editingCabor
+      ? []
+      : pendingNama && !tempCabangNames.includes(pendingNama)
+        ? [...tempCabangNames, pendingNama]
+        : tempCabangNames;
+
+    setCaborSaving(true);
     try {
       const res = editingCabor
         ? await fetch(`/api/cabor/${editingCabor.id}`, {
@@ -310,7 +359,7 @@ export default function AthletesPage() {
           caborId = created?.data?.id ?? created?.id;
         }
         if (caborId) {
-          for (const nama of tempCabangNames) {
+          for (const nama of cabangToSave) {
             if (!nama.trim()) continue;
             try {
               await fetch(`/api/cabor/${caborId}/cabang`, {
@@ -331,11 +380,14 @@ export default function AthletesPage() {
         fetchCabor();
         fetchCabang();
       } else {
-        alert('Gagal menyimpan cabor');
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.message || 'Gagal menyimpan cabor');
       }
     } catch (err) {
       console.error(err);
       alert('Terjadi kesalahan');
+    } finally {
+      setCaborSaving(false);
     }
   };
 
@@ -345,6 +397,7 @@ export default function AthletesPage() {
     setNewCaborNama('');
     setNewCabangNama('');
     setTempCabangNames([]);
+    cancelEditCabang();
     setShowCaborModal(true);
   };
 
@@ -354,6 +407,7 @@ export default function AthletesPage() {
     setNewCaborNama(c.nama_cabor);
     setNewCabangNama('');
     setTempCabangNames([]);
+    cancelEditCabang();
     setShowCaborModal(true);
   };
 
@@ -362,6 +416,8 @@ export default function AthletesPage() {
     const nama = newCabangNama.trim();
     if (!nama) return alert('Nama cabang harus diisi.');
     if (editingCabor) {
+      const cabDup = cabangList.find(c => c.cabor_id === editingCabor.id && c.nama_cabang.toLowerCase() === nama.toLowerCase());
+      if (cabDup) return alert(`Cabang "${nama}" sudah ada pada cabor ini.`);
       try {
         const res = await fetch(`/api/cabor/${editingCabor.id}/cabang`, {
           method: 'POST',
@@ -379,8 +435,55 @@ export default function AthletesPage() {
         alert('Terjadi kesalahan');
       }
     } else {
+      const tmpDup = tempCabangNames.find(n => n.toLowerCase() === nama.toLowerCase());
+      if (tmpDup) return alert(`Cabang "${nama}" sudah ditambahkan.`);
       setTempCabangNames(prev => [...prev, nama]);
       setNewCabangNama('');
+    }
+  };
+
+  // Mulai edit nama cabang (mode edit: id DB; mode tambah: id temp-N)
+  const startEditCabang = (cab: { id: number | string; nama_cabang: string }) => {
+    setEditingCabangId(cab.id);
+    setEditingCabangNama(cab.nama_cabang);
+  };
+
+  const cancelEditCabang = () => {
+    setEditingCabangId(null);
+    setEditingCabangNama('');
+  };
+
+  // Simpan perubahan nama cabang
+  const saveEditCabang = async (cab: { id: number | string; nama_cabang: string }) => {
+    const nama = editingCabangNama.trim();
+    if (!nama) return alert('Nama cabang harus diisi.');
+
+    if (editingCabor && typeof cab.id === 'number') {
+      const cabDup = cabangList.find(c => c.cabor_id === editingCabor.id && c.nama_cabang.toLowerCase() === nama.toLowerCase() && c.id !== cab.id);
+      if (cabDup) return alert(`Cabang "${nama}" sudah ada pada cabor ini.`);
+      try {
+        const res = await fetch(`/api/cabor/${editingCabor.id}/cabang/${cab.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nama_cabang: nama })
+        });
+        if (res.ok) {
+          // Jika cabang ini sedang terpilih di form prestasi, ikut perbarui nama terpilihnya
+          if (selectedCabang === cab.nama_cabang) setSelectedCabang(nama);
+          cancelEditCabang();
+          fetchCabang();
+        } else {
+          const data = await res.json().catch(() => ({}));
+          alert(data.message || 'Gagal mengubah cabang');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Terjadi kesalahan');
+      }
+    } else {
+      // Mode tambah: cukup ganti nama di daftar sementara
+      setTempCabangNames(prev => prev.map(n => n === cab.nama_cabang ? nama : n));
+      cancelEditCabang();
     }
   };
 
@@ -405,36 +508,21 @@ export default function AthletesPage() {
     }
   };
 
-  // Tambah cabang cepat langsung dari form prestasi (milik cabor atlet terpilih)
-  const handleAddInlineCabang = async () => {
-    const nama = inlineCabangNama.trim();
-    if (!nama) return alert('Nama cabang harus diisi.');
-    const atletObj = atletList.find(a => a.nama_atlet === selectedAtletName);
-    if (!atletObj) return alert('Pilih atlet terlebih dahulu.');
-    try {
-      const res = await fetch(`/api/cabor/${atletObj.cabor_id}/cabang`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nama_cabang: nama })
-      });
-      if (res.ok) {
-        setInlineCabangNama('');
-        setSelectedCabang(nama);
-        fetchCabang();
-      } else {
-        alert('Gagal menambah cabang');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Terjadi kesalahan');
-    }
-  };
-
   const handleSaveAtlet = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (atletSaving) return; // cegah double-submit
     if (!newAtletNama) return alert('Nama atlet harus diisi.');
     const selCabor = caborList.find(c => c.nama_cabor === newAtletCabor);
     if (!selCabor) return alert('Cabang olahraga invalid.');
+    const namaAtlet = newAtletNama.trim();
+    // Duplikat = nama + cabor + daerah semuanya sama (beda daerah → boleh)
+    const atletDup = atletList.find(a =>
+      a.nama_atlet.toLowerCase() === namaAtlet.toLowerCase() &&
+      a.cabor_id === selCabor.id &&
+      a.kabupaten_kota.toLowerCase() === newAtletDaerah.trim().toLowerCase() &&
+      a.id !== editingAtlet?.id
+    );
+    if (atletDup) return alert(`Atlet "${namaAtlet}" sudah terdaftar pada cabor dan daerah yang sama.`);
 
     const payload = {
       nama_atlet: newAtletNama,
@@ -442,6 +530,7 @@ export default function AthletesPage() {
       cabor_id: selCabor.id
     };
 
+    setAtletSaving(true);
     try {
       const res = editingAtlet
         ? await fetch(`/api/atlet/${editingAtlet.id}`, {
@@ -461,11 +550,14 @@ export default function AthletesPage() {
         await fetchAtlet();
         setSelectedAtletName(newAtletNama);
       } else {
-        alert('Gagal menyimpan atlet');
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.message || 'Gagal menyimpan atlet');
       }
     } catch (err) {
       console.error(err);
       alert('Terjadi kesalahan');
+    } finally {
+      setAtletSaving(false);
     }
   };
 
@@ -574,6 +666,14 @@ export default function AthletesPage() {
   const cabangOptions = selAtletObj
     ? cabangList.filter(c => c.cabor_id === selAtletObj.cabor_id).map(c => c.nama_cabang)
     : [];
+
+  // Nama cabor atlet terpilih & apakah cabor tersebut punya cabang
+  const selCaborNama = selAtletObj
+    ? caborList.find(c => c.id === selAtletObj.cabor_id)?.nama_cabor || ''
+    : '';
+  const caborHasCabang = selAtletObj
+    ? cabangList.some(c => c.cabor_id === selAtletObj.cabor_id)
+    : false;
 
   // Potongan halaman untuk tabel manajemen (client-side).
   // Safe page dihitung langsung (bukan via useEffect) agar tidak ada frame kosong
@@ -945,7 +1045,8 @@ export default function AthletesPage() {
               </div>
               <button
                 onClick={() => { setShowInputModal(false); setEditingPrestasi(null); }}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
+                disabled={prestasiSaving}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition disabled:opacity-40"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -960,7 +1061,7 @@ export default function AthletesPage() {
                         label="Pilih Atlet"
                         value={selectedAtletName}
                         options={atletOptions}
-                        onSelect={(v) => { setSelectedAtletName(v); setSelectedCabang('Tanpa Cabang'); }}
+                        onSelect={(v) => { setSelectedAtletName(v); syncCabangAfterAtlet(v); }}
                       />
                     ) : (
                       <div className="text-sm text-gray-500 font-medium pb-2 border-b">
@@ -980,36 +1081,34 @@ export default function AthletesPage() {
 
                 {selAtletObj && (
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                      Cabang Cabor <span className="text-gray-400 font-medium normal-case">(opsional)</span>
-                    </label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <div className="flex-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {/* Dropdown Cabor — menampilkan cabor dari atlet yang dipilih */}
+                      <div>
                         <FormSelect
-                          label=" "
-                          value={selectedCabang}
-                          options={['Tanpa Cabang', ...cabangOptions]}
-                          onSelect={setSelectedCabang}
+                          label="Cabor"
+                          value={selCaborNama}
+                          options={selCaborNama ? [selCaborNama] : []}
+                          onSelect={() => {}}
                         />
                       </div>
-                      <div className="flex items-end gap-2">
-                        <input
-                          type="text"
-                          placeholder="Tambah baru (mis. Renang 200m)"
-                          value={inlineCabangNama}
-                          onChange={(e) => setInlineCabangNama(e.target.value)}
-                          className="flex-1 sm:w-60 px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddInlineCabang}
-                          className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs py-2.5 px-3.5 rounded-xl transition border border-gray-200"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Tambah
-                        </button>
-                      </div>
+                      {/* Dropdown Cabang Cabor — hanya muncul jika cabor punya cabang */}
+                      {caborHasCabang ? (
+                        <div>
+                          <FormSelect
+                            label="Cabang Cabor"
+                            required
+                            value={selectedCabang}
+                            options={[CABANG_PLACEHOLDER, ...cabangOptions]}
+                            onSelect={setSelectedCabang}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-end text-xs text-gray-400 font-medium pb-2.5">
+                          Cabor ini belum memiliki cabang.
+                        </div>
+                      )}
                     </div>
+
                   </div>
                 )}
 
@@ -1062,17 +1161,19 @@ export default function AthletesPage() {
               <button
                 type="button"
                 onClick={() => { setShowInputModal(false); setEditingPrestasi(null); }}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
+                disabled={prestasiSaving}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition disabled:opacity-40"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleSavePrestasi}
-                className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
+                disabled={prestasiSaving}
+                className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4" />
-                <span>{editingPrestasi ? 'Simpan Perubahan' : 'Simpan Prestasi'}</span>
+                {prestasiSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{prestasiSaving ? 'Menyimpan...' : editingPrestasi ? 'Simpan Perubahan' : 'Simpan Prestasi'}</span>
               </button>
             </div>
           </div>
@@ -1091,7 +1192,8 @@ export default function AthletesPage() {
               </div>
               <button
                 onClick={() => { setShowCaborModal(false); setEditingCabor(null); }}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
+                disabled={caborSaving}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition disabled:opacity-40"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1122,15 +1224,61 @@ export default function AthletesPage() {
                     : tempCabangNames.map((n, i) => ({ id: `temp-${i}`, cabor_id: 0, nama_cabang: n }))
                   ).map((cab) => (
                     <div key={cab.id} className="flex items-center justify-between bg-slate-50 border border-gray-200 rounded-xl px-3.5 py-2.5">
-                      <span className="text-sm font-medium text-gray-800">{cab.nama_cabang}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeCabang(cab)}
-                        title="Hapus cabang"
-                        className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-1.5 rounded-lg transition"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {editingCabangId === cab.id ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <input
+                            type="text"
+                            value={editingCabangNama}
+                            onChange={(e) => setEditingCabangNama(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                saveEditCabang(cab);
+                              }
+                            }}
+                            autoFocus
+                            className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-900 outline-none focus:border-[#b91c1c] transition"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => saveEditCabang(cab)}
+                            title="Simpan cabang"
+                            className="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg transition"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEditCabang}
+                            title="Batal"
+                            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-sm font-medium text-gray-800">{cab.nama_cabang}</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => startEditCabang(cab)}
+                              title="Edit nama cabang"
+                              className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeCabang(cab)}
+                              title="Hapus cabang"
+                              className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-1.5 rounded-lg transition"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                   {(editingCabor
@@ -1149,12 +1297,20 @@ export default function AthletesPage() {
                     placeholder="Contoh: Renang 200 meter"
                     value={newCabangNama}
                     onChange={(e) => setNewCabangNama(e.target.value)}
-                    className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault(); // tambah cabang, jangan submit cabor
+                        addCabangToCabor();
+                      }
+                    }}
+                    disabled={caborSaving}
+                    className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition disabled:opacity-50"
                   />
                   <button
                     type="button"
                     onClick={addCabangToCabor}
-                    className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs py-2.5 px-4 rounded-xl transition border border-gray-200"
+                    disabled={caborSaving}
+                    className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs py-2.5 px-4 rounded-xl transition border border-gray-200 disabled:opacity-50"
                   >
                     <Plus className="w-4 h-4" />
                     Tambah
@@ -1167,17 +1323,19 @@ export default function AthletesPage() {
               <button
                 type="button"
                 onClick={() => { setShowCaborModal(false); setEditingCabor(null); }}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
+                disabled={caborSaving}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition disabled:opacity-40"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleSaveCabor}
-                className="flex items-center space-x-2 bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
+                disabled={caborSaving}
+                className="flex items-center space-x-2 bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4" />
-                <span>{editingCabor ? 'Simpan Perubahan' : 'Simpan Cabor'}</span>
+                {caborSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{caborSaving ? 'Menyimpan...' : editingCabor ? 'Simpan Perubahan' : 'Simpan Cabor'}</span>
               </button>
             </div>
           </div>
@@ -1196,7 +1354,8 @@ export default function AthletesPage() {
               </div>
               <button
                 onClick={() => { setShowAtletModal(false); setEditingAtlet(null); }}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
+                disabled={atletSaving}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition disabled:opacity-40"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1239,17 +1398,19 @@ export default function AthletesPage() {
               <button
                 type="button"
                 onClick={() => { setShowAtletModal(false); setEditingAtlet(null); }}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
+                disabled={atletSaving}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition disabled:opacity-40"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleSaveAtlet}
-                className="flex items-center space-x-2 bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
+                disabled={atletSaving}
+                className="flex items-center space-x-2 bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4" />
-                <span>{editingAtlet ? 'Simpan Perubahan' : 'Daftarkan Atlet'}</span>
+                {atletSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{atletSaving ? 'Menyimpan...' : editingAtlet ? 'Simpan Perubahan' : 'Daftarkan Atlet'}</span>
               </button>
             </div>
           </div>

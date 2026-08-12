@@ -1,6 +1,75 @@
 import { NextResponse } from "next/server";
 import { CabangCaborService } from "@/services/cabang-cabor.service";
 import { CabangCaborRepository } from "@/repositories/cabang-cabor.repository";
+import { ValidationError } from "@/lib/errors";
+
+/**
+ * Endpoint PUT /api/cabor/[id]/cabang/[cabangId]
+ * Memperbarui nama cabang cabor tertentu.
+ * Request Body: { nama_cabang: string }
+ */
+export async function PUT(
+    req: Request,
+    { params }: { params: Promise<{ id: string; cabangId: string }> }
+) {
+    try {
+        const { id, cabangId } = await params;
+
+        // Pastikan cabang yang diubah benar-benar milik cabor pada URL
+        // (mencegah perubahan silang antar cabor).
+        const existing = await CabangCaborRepository.findById(cabangId);
+        if (!existing || String(existing.cabor_id) !== id) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: "data cabang cabor tidak ditemukan untuk cabor ini"
+                },
+                { status: 404 }
+            );
+        }
+
+        const body = await req.json();
+        const updated = await CabangCaborService.update(cabangId, body);
+
+        if (!updated) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: "data cabang cabor tidak ditemukan"
+                },
+                { status: 404 }
+            );
+        }
+
+        return NextResponse.json(
+            {
+                status: "success",
+                message: "data cabang cabor berhasil diperbarui",
+                data: updated
+            },
+            { status: 200 }
+        );
+    } catch (error: any) {
+        if (error instanceof ValidationError) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: error.message
+                },
+                { status: 400 }
+            );
+        }
+        console.error(`Gagal memperbarui data cabang cabor:`, error);
+        return NextResponse.json(
+            {
+                status: "error",
+                message: "gagal memperbarui data cabang cabor",
+                error: error.message || error
+            },
+            { status: 500 }
+        );
+    }
+}
 
 /**
  * Endpoint DELETE /api/cabor/[id]/cabang/[cabangId]

@@ -61,6 +61,27 @@ export const CabangCaborRepository = {
     },
 
     /**
+     * Memperbarui nama cabang cabor berdasarkan ID.
+     * @param id ID Cabang Cabor
+     * @param namaCabang Nama cabang baru
+     * @returns null jika ID tidak ditemukan, selain itu data cabang yang diperbarui
+     */
+    async update(id: string, namaCabang: string) {
+        const { data: updated, error } = await supabase
+            .from("cabang_cabor")
+            .update({ nama_cabang: namaCabang, updated_at: new Date().toISOString() })
+            .eq("id", id)
+            .select()
+            .maybeSingle();
+
+        if (error) {
+            console.error(`Gagal memperbarui cabang cabor dengan ID ${id}:`, error.message);
+            throw error;
+        }
+        return updated; // null jika ID tidak ditemukan
+    },
+
+    /**
      * Menghapus cabang cabor berdasarkan ID.
      * Prestasi yang mereferensikannya otomatis di-set null (FK on delete set null).
      * @param id ID Cabang Cabor
