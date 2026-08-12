@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { 
   AlertTriangle, 
-  ChevronRight 
+  ChevronRight,
+  MapPin 
 } from 'lucide-react';
 import { 
   Chart as ChartJS, 
@@ -113,6 +114,11 @@ export default function DashboardPage() {
 
   const [timeFilter, setTimeFilter] = useState<'1BLN' | '3BLN' | '1TH' | '3TH' | 'Maks'>('Maks');
 
+  // Peran & wilayah pengguna yang login — admin wilayah hanya melihat data wilayahnya sendiri
+  const [userRole, setUserRole] = useState<'superadmin' | 'admin_wilayah' | null>(null);
+  const [userRegion, setUserRegion] = useState<string | null>(null);
+  const isRegionalAdmin = userRole === 'admin_wilayah';
+
   // Deteksi layar mobile — di mobile peta disembunyikan, hanya daftar wilayah yang ditampilkan
   const [isMobile, setIsMobile] = useState(false);
 
@@ -154,6 +160,17 @@ export default function DashboardPage() {
       .then(data => {
         const arr = Array.isArray(data) ? data : data.data || [];
         setPrestasiList(arr);
+      })
+      .catch(console.error);
+
+    // Muat peran pengguna — menentukan tampilan (peta hanya untuk super admin)
+    fetch('/api/auth/me')
+      .then(res => (res.ok ? res.json() : null))
+      .then(d => {
+        if (d?.data) {
+          setUserRole(d.data.role);
+          setUserRegion(d.data.region ?? null);
+        }
       })
       .catch(console.error);
 
@@ -276,6 +293,12 @@ export default function DashboardPage() {
     }).sort((a, b) => b.total_emas - a.total_emas);
   }, [dashboardData]);
 
+  // Wilayah milik admin wilayah (dipakai untuk kartu ringkasan tanpa peta)
+  const myRegion = useMemo(
+    () => (userRegion ? mappedRegions.find(r => r.kabupaten_kota === userRegion) : undefined),
+    [mappedRegions, userRegion]
+  );
+
   // Jika wilayah sudah dipilih sebelum data API tiba, sinkronkan jumlah medali dari data terbaru.
   // Pola resmi React: adjust state during render (tanpa useEffect) agar tidak cascading render.
   const updatedRegion = activeRegion && dashboardData
@@ -364,7 +387,9 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Ringkasan aktivitas dan statistik sistem.
+          {isRegionalAdmin
+            ? `Ringkasan aktivitas dan statistik wilayah ${userRegion || 'Anda'}.`
+            : 'Ringkasan aktivitas dan statistik sistem.'}
         </p>
       </div>
 
@@ -381,7 +406,32 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Peta Wilayah (desktop) / Daftar Wilayah (mobile) */}
+      {/* Admin wilayah: ringkasan wilayah sendiri (tanpa peta) */}
+      {isRegionalAdmin ? (
+        <Card className="p-5 animate-slide-in-up">
+          <div className="flex items-center gap-3 pb-4 border-b border-gray-100 mb-5">
+            <div className="w-10 h-10 rounded-full bg-red-50 border border-red-200 text-[#dc2626] flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wider">Wilayah Anda</div>
+              <div className="text-xl font-black text-gray-900">{userRegion || '—'}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 text-center">
+            {[
+              { label: 'Emas', value: myRegion?.total_emas ?? 0, color: 'text-[#dc2626]' },
+              { label: 'Perak', value: myRegion?.total_perak ?? 0, color: 'text-gray-700' },
+              { label: 'Perunggu', value: myRegion?.total_perunggu ?? 0, color: 'text-amber-600' },
+            ].map((m) => (
+              <div key={m.label} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <div className="text-xs font-bold text-gray-500">{m.label}</div>
+                <div className={`text-2xl sm:text-3xl font-black ${m.color}`}>{m.value}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : (
       <Card className="relative overflow-hidden h-[520px] sm:h-[620px] lg:h-[720px] animate-slide-in-up">
         {/* Map — hanya desktop; di mobile peta dihilangkan (tidak dimount) */}
         {!isMobile && (
@@ -453,6 +503,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </Card>
+      )}
 
       {/* Tren Performa Medali Tahunan */}
       <Card className="p-5">
@@ -475,8 +526,8 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      {/* EWS */}
-      <Card className="p-5">
+      {/* EWS — khusus super admin (arsip SK bersifat provinsi) */}
+      {!isRegionalAdmin && <Card className="p-5">
         <div className="flex items-center space-x-2 pb-3 mb-3 border-b border-gray-100">
           <AlertTriangle className="w-5 h-5 text-[#dc2626] shrink-0" />
           <div>
@@ -518,7 +569,7 @@ export default function DashboardPage() {
             <ChevronRight className="w-3.5 h-3.5" />
           </a>
         </div>
-      </Card>
+      </Card>}
     </div>
   );
 }

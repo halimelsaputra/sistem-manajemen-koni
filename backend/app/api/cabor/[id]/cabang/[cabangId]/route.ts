@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { CabangCaborService } from "@/services/cabang-cabor.service";
 import { CabangCaborRepository } from "@/repositories/cabang-cabor.repository";
 import { ValidationError } from "@/lib/errors";
+import { getSession, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 /**
  * Endpoint PUT /api/cabor/[id]/cabang/[cabangId]
@@ -13,6 +14,12 @@ export async function PUT(
     { params }: { params: Promise<{ id: string; cabangId: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat mengelola cabang cabor.");
+        }
+
         const { id, cabangId } = await params;
 
         // Pastikan cabang yang diubah benar-benar milik cabor pada URL
@@ -81,6 +88,12 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string; cabangId: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat mengelola cabang cabor.");
+        }
+
         const { id, cabangId } = await params;
 
         // Pastikan cabang yang dihapus benar-benar milik cabor pada URL

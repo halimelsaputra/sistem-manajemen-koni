@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { CabangCaborService } from "@/services/cabang-cabor.service";
 import { ValidationError } from "@/lib/errors";
+import { getSession, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 /**
  * Endpoint POST /api/cabor/[id]/cabang
@@ -12,6 +13,12 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat mengelola cabang cabor.");
+        }
+
         const { id } = await params;
         const body = await req.json();
         const newCabang = await CabangCaborService.create(id, body);

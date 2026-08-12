@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, Trophy, Home, LogOut, X, Menu } from 'lucide-react'
+import { LayoutDashboard, Trophy, Home, LogOut, X, Menu, KeyRound, ShieldCheck, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -30,14 +30,40 @@ const menuItems: MenuItem[] = [
 ]
 
 const generalItems = [
+  { icon: KeyRound, label: 'Ubah Kata Sandi', href: '/pengaturan' },
   { icon: LogOut, label: 'Keluar', href: '/logout' },
 ]
+
+type SessionUser = {
+  username: string
+  role: 'superadmin' | 'admin_wilayah'
+  region: string | null
+}
 
 export default function Navbar({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true) // kolaps di desktop (lg+)
   const [mobileOpen, setMobileOpen] = useState(false)  // drawer di mobile (<lg)
+  const [user, setUser] = useState<SessionUser | null>(null)
   const pathname = usePathname()
   const [prevPathname, setPrevPathname] = useState(pathname)
+
+  // Muat informasi pengguna yang login (peran & wilayah) — dipakai untuk
+  // menyembunyikan menu yang tidak diizinkan & menampilkan badge pengguna.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/me')
+      .then(async (res) => {
+        if (!res.ok) {
+          if (window.location.pathname !== '/login') window.location.href = '/login';
+          return null;
+        }
+        const data = await res.json();
+        return data?.data ?? null;
+      })
+      .then((u) => { if (!cancelled) setUser(u); })
+      .catch(console.error);
+    return () => { cancelled = true; };
+  }, []);
 
   // Tutup drawer mobile saat pindah halaman (termasuk tombol back/forward browser).
   // Pola resmi React: sesuaikan state saat render, bukan di dalam effect.
@@ -58,6 +84,15 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   if (pathname === '/login') {
     return <>{children}</>;
   }
+
+  // Menu Kepengurusan (arsip SK provinsi) hanya untuk super admin
+  const visibleMenuItems =
+    user?.role === 'superadmin'
+      ? menuItems
+      : menuItems.filter((m) => m.href !== '/management')
+
+  const userRoleLabel =
+    user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin_wilayah' ? `Admin · ${user?.region || 'Wilayah'}` : ''
 
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -160,6 +195,25 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
+        {/* Badge Pengguna — nama + peran/wilayah */}
+        {user && (
+          <div className={cn(
+            "flex items-center gap-2.5 px-3 py-2.5 mb-4 rounded-xl bg-slate-50 border border-gray-100 transition-opacity duration-300",
+            sidebarOpen ? "opacity-100" : "opacity-0"
+          )}>
+            <div className="w-8 h-8 rounded-full bg-[#b91c1c] text-white flex items-center justify-center font-black text-sm shrink-0">
+              {(user.username || 'A').charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-gray-900 truncate">{user.username}</div>
+              <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-500 truncate">
+                {user.role === 'superadmin' ? <ShieldCheck className="w-3 h-3 shrink-0" /> : <MapPin className="w-3 h-3 shrink-0" />}
+                <span className="truncate">{userRoleLabel}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Menu Section */}
         <div className="space-y-4 flex-1">
           <div>
@@ -168,7 +222,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
               sidebarOpen ? "opacity-100" : "opacity-0"
             )}>Menu</p>
             <nav className="space-y-0.5">
-              {menuItems.map((item) => {
+              {visibleMenuItems.map((item) => {
                 const isActive = pathname === item.href
                 const children = item.children
                 const isChildActive = children?.some((c) => pathname === c.href)

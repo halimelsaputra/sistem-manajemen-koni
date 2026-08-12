@@ -1,21 +1,31 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { verifySessionToken, COOKIE_NAME } from '@/lib/auth';
 
 /**
  * Melindungi seluruh API backend (port 3001) dari akses langsung tanpa sesi.
  *
- * Token sesi di-set sebagai cookie `auth_token` oleh frontend saat login,
- * lalu diteruskan ke backend melalui rewrite proxy (Next.js meneruskan
- * header request asli, termasuk Cookie). Nilai default 'authenticated'
- * harus sama dengan nilai cookie yang di-set frontend — bisa dikustomisasi
- * lewat env `AUTH_TOKEN_VALUE` di kedua aplikasi.
+ * Token sesi adalah HMAC bertanda tangan (lihat lib/auth.ts) yang di-set
+ * sebagai cookie `auth_token` oleh endpoint /api/auth/login. Frontend
+ * meneruskan cookie melalui rewrite proxy.
+ *
+ * Endpoint login & logout dibuka (public) — semua endpoint lain wajib
+ * memiliki token sesi yang valid. Pembatasan peran (super admin / admin
+ * wilayah) ditangani di dalam masing-masing route handler.
  */
-const expectedToken = process.env.AUTH_TOKEN_VALUE || 'authenticated';
+const PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout'];
 
-export function middleware(request: NextRequest) {
-  const authToken = request.cookies.get('auth_token')?.value;
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
-  if (!authToken || authToken !== expectedToken) {
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const session = token ? await verifySessionToken(token) : null;
+
+  if (!session) {
     return NextResponse.json(
       { status: 'error', message: 'Unauthorized: sesi tidak valid' },
       { status: 401 }

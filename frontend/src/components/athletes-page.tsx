@@ -13,7 +13,8 @@ import {
   Trash2,
   Pencil,
   Loader2,
-  Check
+  Check,
+  MapPin
 } from 'lucide-react';
 import { MOCK_REGIONS } from '@/data/mockData';
 import { Card } from '@/components/ui/card';
@@ -152,6 +153,10 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
   const [atletFilterDaerah, setAtletFilterDaerah] = useState('Semua Daerah');
   const [caborSearch, setCaborSearch] = useState('');
 
+  // Peran & wilayah pengguna yang login — menentukan pembatasan akses
+  const [userRole, setUserRole] = useState<'superadmin' | 'admin_wilayah' | null>(null);
+  const [userRegion, setUserRegion] = useState<string | null>(null);
+
   // Penjaga race condition: respons basi dari request lama diabaikan
   const requestSeq = useRef(0);
 
@@ -231,7 +236,29 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
     fetchCabor();
     fetchAtlet();
     fetchCabang();
+    // Muat peran pengguna — menentukan batasan wilayah & hak akses
+    fetch('/api/auth/me')
+      .then(res => (res.ok ? res.json() : null))
+      .then(d => {
+        if (d?.data) {
+          setUserRole(d.data.role);
+          setUserRegion(d.data.region ?? null);
+        }
+      })
+      .catch(console.error);
   }, []);
+
+  const isSuperAdmin = userRole === 'superadmin';
+  const isRegionalAdmin = userRole === 'admin_wilayah';
+
+  // Admin wilayah: kunci filter & form ke wilayahnya sendiri.
+  // Pola resmi React — sesuaikan state saat render (bukan di dalam effect)
+  // agar tidak memicu cascading render.
+  if (isRegionalAdmin && userRegion) {
+    if (filterDaerah !== userRegion) setFilterDaerah(userRegion);
+    if (atletFilterDaerah !== userRegion) setAtletFilterDaerah(userRegion);
+    if (newAtletDaerah !== userRegion) setNewAtletDaerah(userRegion);
+  }
 
   const handleSavePrestasi = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -799,12 +826,22 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
             </div>
 
             <div className="shrink-0">
-              <FormSelect
-                label="Daerah"
-                value={filterDaerah}
-                options={['Semua Daerah', ...MOCK_REGIONS.map(r => r.kabupaten_kota)]}
-                onSelect={(v) => { setFilterDaerah(v); setPage(1); }}
-              />
+              {isRegionalAdmin ? (
+                <>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Daerah</label>
+                  <div className="px-3.5 py-2.5 bg-slate-100 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#b91c1c]" />
+                    {userRegion}
+                  </div>
+                </>
+              ) : (
+                <FormSelect
+                  label="Daerah"
+                  value={filterDaerah}
+                  options={['Semua Daerah', ...MOCK_REGIONS.map(r => r.kabupaten_kota)]}
+                  onSelect={(v) => { setFilterDaerah(v); setPage(1); }}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -949,12 +986,22 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               />
             </div>
             <div className="shrink-0">
-              <FormSelect
-                label="Daerah"
-                value={atletFilterDaerah}
-                options={['Semua Daerah', ...MOCK_REGIONS.map(r => r.kabupaten_kota)]}
-                onSelect={(v) => { setAtletFilterDaerah(v); setAtletPage(1); }}
-              />
+              {isRegionalAdmin ? (
+                <>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Daerah</label>
+                  <div className="px-3.5 py-2.5 bg-slate-100 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#b91c1c]" />
+                    {userRegion}
+                  </div>
+                </>
+              ) : (
+                <FormSelect
+                  label="Daerah"
+                  value={atletFilterDaerah}
+                  options={['Semua Daerah', ...MOCK_REGIONS.map(r => r.kabupaten_kota)]}
+                  onSelect={(v) => { setAtletFilterDaerah(v); setAtletPage(1); }}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1036,13 +1083,15 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                 {caborList.length} cabor
               </span>
             </div>
-            <button
-              onClick={openAddCaborModal}
-              className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Tambah Cabor</span>
-            </button>
+            {isSuperAdmin && (
+              <button
+                onClick={openAddCaborModal}
+                className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Tambah Cabor</span>
+              </button>
+            )}
           </div>
 
           {/* Search cabor — lebar tetap di kiri, tidak melebar penuh */}
@@ -1081,28 +1130,32 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                   </span>
                 </td>
                 <td className="py-3 px-6 text-right">
-                  <div className="flex items-center justify-end gap-1.5">
-                    <button
-                      onClick={() => openEditCabor(c)}
-                      title="Edit cabor"
-                      className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => openDeleteModal({
-                        entity: 'cabor',
-                        id: c.id,
-                        name: c.nama_cabor,
-                        phrase: `hapus cabor ${c.nama_cabor}`,
-                        description: `Anda akan menghapus cabor "${c.nama_cabor}". Seluruh atlet, prestasi, dan SK yang terkait akan ikut terhapus permanen.`
-                      })}
-                      title="Hapus cabor (cascade ke atlet, prestasi & SK)"
-                      className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {isSuperAdmin ? (
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => openEditCabor(c)}
+                        title="Edit cabor"
+                        className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => openDeleteModal({
+                          entity: 'cabor',
+                          id: c.id,
+                          name: c.nama_cabor,
+                          phrase: `hapus cabor ${c.nama_cabor}`,
+                          description: `Anda akan menghapus cabor "${c.nama_cabor}". Seluruh atlet, prestasi, dan SK yang terkait akan ikut terhapus permanen.`
+                        })}
+                        title="Hapus cabor (cascade ke atlet, prestasi & SK)"
+                        className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400 font-medium">Baca saja</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -1468,12 +1521,22 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               </div>
 
               <div>
-                <FormSelect
-                  label="Asal Kabupaten / Kota"
-                  value={newAtletDaerah}
-                  options={MOCK_REGIONS.map(r => r.kabupaten_kota)}
-                  onSelect={setNewAtletDaerah}
-                />
+                {isRegionalAdmin ? (
+                  <>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Asal Kabupaten / Kota</label>
+                    <div className="px-3.5 py-2.5 bg-slate-100 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#b91c1c]" />
+                      {userRegion}
+                    </div>
+                  </>
+                ) : (
+                  <FormSelect
+                    label="Asal Kabupaten / Kota"
+                    value={newAtletDaerah}
+                    options={MOCK_REGIONS.map(r => r.kabupaten_kota)}
+                    onSelect={setNewAtletDaerah}
+                  />
+                )}
               </div>
             </form>
 

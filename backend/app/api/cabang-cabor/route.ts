@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { CabangCaborService } from "@/services/cabang-cabor.service";
+import { getSession, unauthorizedResponse } from "@/lib/auth";
 
 /**
  * Endpoint GET /api/cabang-cabor
@@ -7,6 +8,9 @@ import { CabangCaborService } from "@/services/cabang-cabor.service";
  */
 export async function GET(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const { searchParams } = new URL(req.url);
         const caborId = searchParams.get("cabor_id") || undefined;
 

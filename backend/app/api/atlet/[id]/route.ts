@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AtletService } from "@/services/atlet.service";
 import { ValidationError } from "@/lib/errors";
 import { validateConfirmPhrase } from "@/lib/delete-guard";
+import { getSession, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 /**
  * Endpoint GET /api/atlet/[id]
@@ -12,8 +13,16 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const { id } = await params;
         const data = await AtletService.getById(id);
+
+        // Admin wilayah hanya dapat melihat atlet di wilayahnya sendiri
+        if (session.role === "admin_wilayah" && data?.kabupaten_kota !== session.region) {
+            return forbiddenResponse();
+        }
 
         if (!data) {
             return NextResponse.json(
@@ -56,8 +65,36 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const { id } = await params;
         const body = await req.json();
+
+        // Admin wilayah: hanya boleh mengubah atlet di wilayahnya sendiri,
+        // dan tidak boleh memindahkan atlet ke wilayah lain.
+        if (session.role === "admin_wilayah") {
+            const existing = await AtletService.getById(id);
+            if (!existing) {
+                return NextResponse.json(
+                    { status: "fail", message: "data atlet tidak ditemukan" },
+                    { status: 404 }
+                );
+            }
+            if (existing.kabupaten_kota !== session.region) {
+                return forbiddenResponse();
+            }
+            if (body.kabupaten_kota && (body.kabupaten_kota || "").trim() !== session.region) {
+                return NextResponse.json(
+                    {
+                        status: "fail",
+                        message: `Anda hanya dapat mengelola atlet untuk wilayah ${session.region}.`
+                    },
+                    { status: 403 }
+                );
+            }
+        }
+
         const updatedAtlet = await AtletService.update(id, body);
 
         return NextResponse.json(
@@ -100,6 +137,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const { id } = await params;
 
         // Ambil data dulu untuk memvalidasi frasa konfirmasi (server-side guard)
@@ -112,6 +152,11 @@ export async function DELETE(
                 },
                 { status: 404 }
             );
+        }
+
+        // Admin wilayah: hanya boleh menghapus atlet di wilayahnya sendiri
+        if (session.role === "admin_wilayah" && existing.kabupaten_kota !== session.region) {
+            return forbiddenResponse();
         }
 
         const body = await req.json().catch(() => ({}));

@@ -2,22 +2,33 @@ import { NextResponse } from "next/server";
 import { PrestasiService } from "@/services/prestasi.service";
 import { ValidationError } from "@/lib/errors";
 import { parsePagination, toPaginatedData, isPaginatedResult } from "@/lib/pagination";
+import { getSession, unauthorizedResponse } from "@/lib/auth";
+import { AtletService } from "@/services/atlet.service";
 
 /**
  * Endpoint GET /api/prestasi
  * Mengambil data prestasi dengan filter opsional (atlet_id, tingkat_lomba, mendali, tanggal, search).
+ * Admin wilayah hanya dapat melihat prestasi atlet di wilayahnya sendiri.
  */
 export async function GET(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const { searchParams } = new URL(req.url);
         const atlet_id = searchParams.get("atlet_id") || undefined;
         const tingkat_lomba = searchParams.get("tingkat_lomba") || undefined;
         const mendali = searchParams.get("mendali") || undefined;
         const tanggal = searchParams.get("tanggal") || undefined;
         const cabor_id = searchParams.get("cabor_id") || undefined;
-        const kabupaten_kota = searchParams.get("kabupaten_kota") || undefined;
+        let kabupaten_kota = searchParams.get("kabupaten_kota") || undefined;
         const search = searchParams.get("search") || undefined;
         const pagination = parsePagination(searchParams);
+
+        // Admin wilayah: paksa filter ke wilayahnya
+        if (session.role === "admin_wilayah") {
+            kabupaten_kota = session.region ?? undefined;
+        }
 
         const result = await PrestasiService.getAll(
             { atlet_id, tingkat_lomba, mendali, tanggal, cabor_id, kabupaten_kota, search },
@@ -67,7 +78,25 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const body = await req.json();
+
+        // Admin wilayah: hanya boleh mencatat prestasi untuk atlet di wilayahnya sendiri
+        if (session.role === "admin_wilayah") {
+            const atlet = await AtletService.getById(String(body.atlet_id));
+            if (!atlet || atlet.kabupaten_kota !== session.region) {
+                return NextResponse.json(
+                    {
+                        status: "fail",
+                        message: `Anda hanya dapat mencatat prestasi untuk atlet di wilayah ${session.region}.`
+                    },
+                    { status: 403 }
+                );
+            }
+        }
+
         const newPrestasi = await PrestasiService.create(body);
 
         return NextResponse.json(

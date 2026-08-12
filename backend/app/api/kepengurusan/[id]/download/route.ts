@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { KepengurusanService } from "@/services/kepengurusan.service";
 import { supabase } from "@/lib/supabase";
+import { getSession, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 const BUCKET = "sk-documents";
 const TTL_SECONDS = 300; // 5 menit — PRD: Secure Signed URL kedaluwarsa otomatis
@@ -14,10 +15,16 @@ const TTL_SECONDS = 300; // 5 menit — PRD: Secure Signed URL kedaluwarsa otoma
  * setelah 5 menit sesuai PRD Non-Functional Security.
  */
 export async function GET(
-    _req: Request,
+    req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat mengunduh dokumen SK.");
+        }
+
         const { id } = await params;
 
         // Ambil data kepengurusan untuk mendapatkan path file di storage

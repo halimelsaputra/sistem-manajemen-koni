@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { CaborService } from "@/services/cabor.service";
 import { ValidationError } from "@/lib/errors";
+import { getSession, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 /**
  * Endpoint GET /api/cabor
  * Mengambil data cabang olahraga (cabor) dengan filter opsional (search).
+ * Dapat diakses semua peran (admin wilayah butuh daftar cabor untuk dropdown).
  */
 export async function GET(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || undefined;
 
@@ -41,6 +46,12 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat menambahkan cabang olahraga.");
+        }
+
         const body = await req.json();
         const newCabor = await CaborService.create(body);
 

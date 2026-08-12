@@ -2,18 +2,28 @@ import { NextResponse } from "next/server";
 import { AtletService } from "@/services/atlet.service";
 import { ValidationError } from "@/lib/errors";
 import { parsePagination, toPaginatedData, isPaginatedResult } from "@/lib/pagination";
+import { getSession, unauthorizedResponse } from "@/lib/auth";
 
 /**
  * Endpoint GET /api/atlet
  * Mengambil data atlet dengan filter opsional (search, kabupaten_kota, cabor_id).
+ * Admin wilayah hanya dapat melihat atlet di wilayahnya sendiri.
  */
 export async function GET(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || undefined;
-        const kabupaten_kota = searchParams.get("kabupaten_kota") || undefined;
+        let kabupaten_kota = searchParams.get("kabupaten_kota") || undefined;
         const cabor_id = searchParams.get("cabor_id") || undefined;
         const pagination = parsePagination(searchParams);
+
+        // Admin wilayah: paksa filter ke wilayahnya — filter dari user diabaikan
+        if (session.role === "admin_wilayah") {
+            kabupaten_kota = session.region ?? undefined;
+        }
 
         const result = await AtletService.getAll({ search, kabupaten_kota, cabor_id }, pagination ?? undefined);
 
@@ -60,7 +70,22 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const body = await req.json();
+
+        // Admin wilayah: hanya boleh mendaftarkan atlet untuk wilayahnya sendiri
+        if (session.role === "admin_wilayah" && (body.kabupaten_kota || "").trim() !== session.region) {
+            return NextResponse.json(
+                {
+                    status: "fail",
+                    message: `Anda hanya dapat menambahkan atlet untuk wilayah ${session.region}.`
+                },
+                { status: 403 }
+            );
+        }
+
         const newAtlet = await AtletService.create(body);
 
         return NextResponse.json(

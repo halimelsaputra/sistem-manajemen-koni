@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { CaborService } from "@/services/cabor.service";
 import { ValidationError } from "@/lib/errors";
 import { validateConfirmPhrase } from "@/lib/delete-guard";
+import { getSession, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 /**
  * Endpoint GET /api/cabor/[id]
@@ -12,6 +13,9 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
         const { id } = await params;
         const data = await CaborService.getById(id);
 
@@ -56,6 +60,12 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat mengubah cabang olahraga.");
+        }
+
         const { id } = await params;
         const body = await req.json();
         const updatedCabor = await CaborService.update(id, body);
@@ -101,6 +111,12 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat menghapus cabang olahraga.");
+        }
+
         const { id } = await params;
 
         // Ambil data dulu untuk memvalidasi frasa konfirmasi (server-side guard)

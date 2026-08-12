@@ -3,11 +3,13 @@ import { supabase } from "@/lib/supabase";
 export const DashboardRepository = {
     /**
      * Mengambil jumlah total data atlet.
+     * @param region Opsional — batasi per kabupaten/kota (untuk admin wilayah).
      */
-    async countAtlet() {
-        const { count, error } = await supabase
-            .from("atlet")
-            .select("*", { count: "exact", head: true });
+    async countAtlet(region?: string) {
+        let query = supabase.from("atlet").select("*", { count: "exact", head: true });
+        if (region) query = query.eq("kabupaten_kota", region);
+
+        const { count, error } = await query;
 
         if (error) {
             console.error("Gagal menghitung total atlet:", error.message);
@@ -33,11 +35,13 @@ export const DashboardRepository = {
 
     /**
      * Mengambil jumlah total data prestasi.
+     * @param region Opsional — batasi prestasi atlet di kabupaten/kota tertentu.
      */
-    async countPrestasi() {
-        const { count, error } = await supabase
-            .from("prestasi")
-            .select("*", { count: "exact", head: true });
+    async countPrestasi(region?: string) {
+        let query = supabase.from("prestasi").select("*", { count: "exact", head: true });
+        if (region) query = query.eq("atlet.kabupaten_kota", region);
+
+        const { count, error } = await query;
 
         if (error) {
             console.error("Gagal menghitung total prestasi:", error.message);
@@ -63,11 +67,13 @@ export const DashboardRepository = {
 
     /**
      * Mengambil data perolehan medali per wilayah dari tabel prestasi dan atlet (dynamic calculation).
+     * @param region Opsional — jika diisi, hanya menghitung untuk wilayah tersebut.
      */
-    async getMedalsByRegion() {
-        const { data, error } = await supabase
-            .from("prestasi")
-            .select("mendali, atlet(kabupaten_kota)");
+    async getMedalsByRegion(region?: string) {
+        let query = supabase.from("prestasi").select("mendali, atlet(kabupaten_kota)");
+        if (region) query = query.eq("atlet.kabupaten_kota", region);
+
+        const { data, error } = await query;
 
         if (error) {
             console.error("Gagal mengambil data medali per wilayah:", error.message);

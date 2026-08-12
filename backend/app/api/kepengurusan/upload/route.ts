@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { supabase } from "@/lib/supabase";
+import { getSession, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 const BUCKET = "sk-documents";
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -13,6 +14,12 @@ const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
  */
 export async function POST(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat mengunggah dokumen SK.");
+        }
+
         const formData = await req.formData();
         const file = formData.get("file");
 

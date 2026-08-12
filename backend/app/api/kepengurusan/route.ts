@@ -2,13 +2,21 @@ import { NextResponse } from "next/server";
 import { KepengurusanService } from "@/services/kepengurusan.service";
 import { ValidationError } from "@/lib/errors";
 import { parsePagination, toPaginatedData, isPaginatedResult } from "@/lib/pagination";
+import { getSession, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 /**
  * Endpoint GET /api/kepengurusan
  * Mengambil data kepengurusan dengan filter opsional (cabor_id, status_kepengurusan, search).
+ * Arsip SK bersifat provinsi (per cabor) — khusus super admin.
  */
 export async function GET(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat mengakses arsip SK kepengurusan.");
+        }
+
         const { searchParams } = new URL(req.url);
         const cabor_id = searchParams.get("cabor_id") || undefined;
         const status_kepengurusan = searchParams.get("status_kepengurusan") || undefined;
@@ -63,6 +71,12 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
     try {
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+        if (session.role !== "superadmin") {
+            return forbiddenResponse("Hanya super admin yang dapat mengelola arsip SK kepengurusan.");
+        }
+
         const body = await req.json();
         const newKepengurusan = await KepengurusanService.create(body);
 

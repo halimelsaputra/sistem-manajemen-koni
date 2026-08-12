@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
 import { DashboardService } from "@/services/dashboard.service";
+import { getSession, unauthorizedResponse } from "@/lib/auth";
 
 /**
  * Endpoint GET /api/dashboard
  * Mengambil ringkasan data statistik untuk halaman dashboard (Total Atlet, Cabor, Prestasi, Kepengurusan, perolehan medali per wilayah, tren tahunan, dan peringatan SK kedaluwarsa).
+ * Admin wilayah hanya melihat statistik wilayahnya sendiri; statistik SK hanya untuk super admin.
  */
-export async function GET() {
+export async function GET(req: Request) {
     try {
-        const data = await DashboardService.getSummary();
+        const session = await getSession(req);
+        if (!session) return unauthorizedResponse();
+
+        let region: string | undefined;
+        if (session.role === "admin_wilayah") {
+            region = session.region ?? undefined;
+        }
+
+        const data = await DashboardService.getSummary({
+            region,
+            includeKepengurusan: session.role === "superadmin"
+        });
 
         return NextResponse.json(
             {
