@@ -282,11 +282,31 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
             )}>General</p>
             <nav className="space-y-0.5">
               {generalItems.map((item) => {
+                // 'Keluar' bukan navigasi — pakai <button> (bukan <Link>) agar Next.js
+                // tidak melakukan prefetch ke /logout yang tidak ada (404 di console).
+                if (item.label === 'Keluar') {
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={handleLogout}
+                      className={cn(
+                        'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 text-left',
+                      )}
+                    >
+                      <item.icon className="w-4 h-4 shrink-0" />
+                      <span className={cn(
+                        "text-sm whitespace-nowrap transition-opacity duration-300",
+                        sidebarOpen ? "opacity-100" : "opacity-0"
+                      )}>{item.label}</span>
+                    </button>
+                  )
+                }
                 return (
                   <Link
                     key={item.label}
                     href={item.href}
-                    onClick={item.label === 'Keluar' ? handleLogout : () => setMobileOpen(false)}
+                    onClick={() => setMobileOpen(false)}
                     className={cn(
                       'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200',
                     )}
