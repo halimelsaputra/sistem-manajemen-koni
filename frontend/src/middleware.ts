@@ -18,8 +18,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Halaman khusus super admin (arsip SK kepengurusan bersifat provinsi)
-  if (pathname.startsWith('/management') && session.role !== 'superadmin') {
+  // Halaman khusus super admin (arsip SK kepengurusan bersifat provinsi & pengaturan admin)
+  if (
+    (pathname.startsWith('/management') || pathname.startsWith('/pengaturan')) &&
+    session.role !== 'superadmin'
+  ) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 

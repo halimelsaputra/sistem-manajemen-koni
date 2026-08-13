@@ -30,7 +30,7 @@ const menuItems: MenuItem[] = [
 ]
 
 const generalItems = [
-  { icon: KeyRound, label: 'Ubah Kata Sandi', href: '/pengaturan' },
+  { icon: KeyRound, label: 'Pengaturan Admin', href: '/pengaturan', superOnly: true },
   { icon: LogOut, label: 'Keluar', href: '/logout' },
 ]
 
@@ -281,7 +281,9 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
               sidebarOpen ? "opacity-100" : "opacity-0"
             )}>General</p>
             <nav className="space-y-0.5">
-              {generalItems.map((item) => {
+              {generalItems
+                .filter((item) => !item.superOnly || user?.role === 'superadmin')
+                .map((item) => {
                 // 'Keluar' bukan navigasi — pakai <button> (bukan <Link>) agar Next.js
                 // tidak melakukan prefetch ke /logout yang tidak ada (404 di console).
                 if (item.label === 'Keluar') {
@@ -302,13 +304,17 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                     </button>
                   )
                 }
+                const isGeneralActive = pathname === item.href
                 return (
                   <Link
                     key={item.label}
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
                     className={cn(
-                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200',
+                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+                      isGeneralActive
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
                     )}
                   >
                     <item.icon className="w-4 h-4 shrink-0" />

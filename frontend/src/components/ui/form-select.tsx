@@ -12,9 +12,13 @@ interface FormSelectProps {
   required?: boolean;
   /** Tampilkan kotak pencarian di dalam dropdown untuk menyaring opsi */
   searchable?: boolean;
+  /** Teks abu-abu saat belum ada nilai terpilih, mis. "Pilih wilayah..." */
+  placeholder?: string;
+  /** Opsi yang tidak dapat dipilih (tetap terlihat, ditandai disabled) */
+  disabledOptions?: Set<string>;
 }
 
-export function FormSelect({ label, value, options, onSelect, required = false, searchable = false }: FormSelectProps) {
+export function FormSelect({ label, value, options, onSelect, required = false, searchable = false, placeholder, disabledOptions }: FormSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -49,7 +53,9 @@ export function FormSelect({ label, value, options, onSelect, required = false, 
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 outline-none focus:bg-white focus:border-[#b91c1c] transition cursor-pointer flex items-center justify-between"
       >
-        <span className="truncate">{value}</span>
+        <span className={value ? "truncate" : "truncate text-gray-400"}>
+          {value || placeholder || ''}
+        </span>
         <ChevronDown
           className={`w-4 h-4 shrink-0 text-gray-400 transition-transform duration-[400ms] ${
             isOpen ? 'rotate-180' : ''
@@ -86,23 +92,29 @@ export function FormSelect({ label, value, options, onSelect, required = false, 
               {filteredOptions.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-gray-400 font-medium">Tidak ada hasil.</div>
               ) : (
-                filteredOptions.map((option) => (
-                  <button
-                    key={option}
-                    type="button" // penting: tanpa ini tombol opsi menjadi submit di dalam <form>
-                    onClick={() => {
-                      onSelect(option);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition ${
-                      value === option
-                        ? 'bg-red-50 text-[#dc2626] font-bold'
-                        : 'text-gray-700 hover:bg-red-50 hover:text-[#dc2626]'
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ))
+                filteredOptions.map((option) => {
+                  const disabled = disabledOptions?.has(option) ?? false;
+                  return (
+                    <button
+                      key={option}
+                      type="button" // penting: tanpa ini tombol opsi menjadi submit di dalam <form>
+                      disabled={disabled}
+                      onClick={() => {
+                        onSelect(option);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition ${
+                        disabled
+                          ? 'text-gray-300 cursor-not-allowed line-through'
+                          : value === option
+                            ? 'bg-red-50 text-[#dc2626] font-bold'
+                            : 'text-gray-700 hover:bg-red-50 hover:text-[#dc2626]'
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  );
+                })
               )}
             </div>
           </div>

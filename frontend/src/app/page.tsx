@@ -431,6 +431,14 @@ export default function DashboardPage() {
             ))}
           </div>
         </Card>
+      ) : userRole === null ? (
+        /* Peran belum dimuat — skeleton loading agar peta tidak "flash" sesaat untuk admin wilayah */
+        <Card className="relative overflow-hidden h-[520px] sm:h-[620px] lg:h-[720px] animate-slide-in-up">
+          <div className="w-full h-full bg-gray-100 animate-pulse flex flex-col items-center justify-center gap-2 text-gray-500 font-medium">
+            <div className="w-6 h-6 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+            <span>Memuat Dashboard...</span>
+          </div>
+        </Card>
       ) : (
       <Card className="relative overflow-hidden h-[520px] sm:h-[620px] lg:h-[720px] animate-slide-in-up">
         {/* Map — hanya desktop; di mobile peta dihilangkan (tidak dimount) */}
@@ -527,7 +535,7 @@ export default function DashboardPage() {
       </Card>
 
       {/* EWS — khusus super admin (arsip SK bersifat provinsi) */}
-      {!isRegionalAdmin && <Card className="p-5">
+      {userRole === 'superadmin' && <Card className="p-5">
         <div className="flex items-center space-x-2 pb-3 mb-3 border-b border-gray-100">
           <AlertTriangle className="w-5 h-5 text-[#dc2626] shrink-0" />
           <div>
