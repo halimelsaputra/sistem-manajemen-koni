@@ -1206,6 +1206,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                       label="Pilih Atlet"
                       value={selectedAtletName}
                       options={atletOptions}
+                      searchable
                       onSelect={(v) => { setSelectedAtletName(v); syncCabangAfterAtlet(v); }}
                     />
                   ) : (

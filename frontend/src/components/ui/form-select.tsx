@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
 
 interface FormSelectProps {
   label: string;
@@ -10,10 +10,13 @@ interface FormSelectProps {
   onSelect: (value: string) => void;
   /** Tampilkan bintang merah — menandai field wajib */
   required?: boolean;
+  /** Tampilkan kotak pencarian di dalam dropdown untuk menyaring opsi */
+  searchable?: boolean;
 }
 
-export function FormSelect({ label, value, options, onSelect, required = false }: FormSelectProps) {
+export function FormSelect({ label, value, options, onSelect, required = false, searchable = false }: FormSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,6 +28,15 @@ export function FormSelect({ label, value, options, onSelect, required = false }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Reset pencarian setiap kali dropdown dibuka/ditutup
+  useEffect(() => {
+    if (!isOpen) setSearch('');
+  }, [isOpen]);
+
+  const filteredOptions = searchable
+    ? options.filter((o) => o.toLowerCase().includes(search.trim().toLowerCase()))
+    : options;
 
   return (
     <div ref={ref} className="relative w-full">
@@ -55,24 +67,43 @@ export function FormSelect({ label, value, options, onSelect, required = false }
           isOpen ? 'opacity-100' : 'opacity-0'
         }`}>
           <div className="bg-white border border-gray-200 shadow-md rounded-b-xl mt-1">
+            {searchable && (
+              <div className="p-2 pb-0">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Cari..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-900 placeholder:text-gray-400 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  />
+                </div>
+              </div>
+            )}
             <div className="p-2 max-h-[200px] overflow-y-auto scrollbar-thin">
-              {options.map((option) => (
-                <button
-                  key={option}
-                  type="button" // penting: tanpa ini tombol opsi menjadi submit di dalam <form>
-                  onClick={() => {
-                    onSelect(option);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition ${
-                    value === option
-                      ? 'bg-red-50 text-[#dc2626] font-bold'
-                      : 'text-gray-700 hover:bg-red-50 hover:text-[#dc2626]'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
+              {filteredOptions.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-gray-400 font-medium">Tidak ada hasil.</div>
+              ) : (
+                filteredOptions.map((option) => (
+                  <button
+                    key={option}
+                    type="button" // penting: tanpa ini tombol opsi menjadi submit di dalam <form>
+                    onClick={() => {
+                      onSelect(option);
+                      setIsOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition ${
+                      value === option
+                        ? 'bg-red-50 text-[#dc2626] font-bold'
+                        : 'text-gray-700 hover:bg-red-50 hover:text-[#dc2626]'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
