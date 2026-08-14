@@ -12,6 +12,7 @@ import {
   UserPlus,
   Trash2,
   Pencil,
+  Eye,
   Loader2,
   Check,
   MapPin
@@ -125,6 +126,11 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
   const [editingPrestasi, setEditingPrestasi] = useState<Prestasi | null>(null);
   const [editingAtlet, setEditingAtlet] = useState<Atlet | null>(null);
   const [editingCabor, setEditingCabor] = useState<Cabor | null>(null);
+
+  // Lihat (view) atlet — modal biodata + riwayat prestasi
+  const [viewingAtlet, setViewingAtlet] = useState<Atlet | null>(null);
+  const [viewingAtletPrestasi, setViewingAtletPrestasi] = useState<Prestasi[]>([]);
+  const [viewingAtletLoading, setViewingAtletLoading] = useState(false);
 
   // Delete flow state (konfirmasi ganda + ketik frasa)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -620,6 +626,25 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
     setShowAtletModal(true);
   };
 
+  // Buka modal lihat atlet — tampilkan biodata + riwayat prestasi (history)
+  const openViewAtlet = async (a: Atlet) => {
+    setViewingAtlet(a);
+    setViewingAtletPrestasi([]);
+    setViewingAtletLoading(true);
+    try {
+      const res = await fetch(`/api/prestasi?atlet_id=${a.id}`);
+      const data = await res.json();
+      const arr = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+      // Urutkan tanggal terbaru dulu (riwayat menurun)
+      arr.sort((x: Prestasi, y: Prestasi) => (y.tanggal || '').localeCompare(x.tanggal || ''));
+      setViewingAtletPrestasi(arr);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setViewingAtletLoading(false);
+    }
+  };
+
   // Buka modal konfirmasi hapus. Untuk atlet/cabor, ambil dampak cascade
   // dari backend agar akurat (list frontend terpaginasi / tidak lengkap).
   const openDeleteModal = async (target: DeleteTarget) => {
@@ -1026,6 +1051,13 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                   <td className="py-3 px-6 font-semibold text-gray-800">{caborName}</td>
                   <td className="py-3 px-6 text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => openViewAtlet(a)}
+                        title="Lihat biodata & riwayat prestasi"
+                        className="text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => openEditAtlet(a)}
                         title="Edit atlet"
@@ -1558,6 +1590,107 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               >
                 {atletSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>{atletSaving ? 'Menyimpan...' : editingAtlet ? 'Simpan Perubahan' : 'Daftarkan Atlet'}</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Lihat Detail Atlet Modal — biodata + riwayat prestasi (pop-up) */}
+      {viewingAtlet && mounted && createPortal(
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
+            <div className="bg-white text-gray-900 border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2">
+                <Eye className="w-5 h-5 text-[#b91c1c]" />
+                <h3 className="font-bold text-base">Detail Atlet</h3>
+              </div>
+              <button
+                onClick={() => setViewingAtlet(null)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-6">
+              {/* Biodata */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Nama Atlet</p>
+                  <p className="font-bold text-gray-900">{viewingAtlet.nama_atlet}</p>
+                </div>
+                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Daerah</p>
+                  <p className="font-bold text-gray-900 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#b91c1c]" />
+                    {viewingAtlet.kabupaten_kota}
+                  </p>
+                </div>
+                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Cabor</p>
+                  <p className="font-bold text-gray-900">
+                    {caborList.find(c => c.id === viewingAtlet.cabor_id)?.nama_cabor || 'Unknown'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Riwayat prestasi */}
+              <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-[#b91c1c]" />
+                Riwayat Prestasi
+                <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
+                  {viewingAtletPrestasi.length} rekor
+                </span>
+              </h4>
+
+              {viewingAtletLoading ? (
+                <div className="flex items-center justify-center py-10 text-gray-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Memuat riwayat...
+                </div>
+              ) : viewingAtletPrestasi.length === 0 ? (
+                <div className="text-center py-10 text-gray-400 text-sm bg-slate-50 rounded-xl border border-dashed border-gray-200">
+                  Belum ada prestasi untuk atlet ini.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {viewingAtletPrestasi.map((p) => {
+                    let medalBadge = 'bg-gray-100 text-gray-600 border-gray-200';
+                    if (p.mendali === 'Emas') {
+                      medalBadge = 'bg-amber-100 text-amber-800 border-amber-300';
+                    } else if (p.mendali === 'Perak') {
+                      medalBadge = 'bg-slate-100 text-slate-800 border-slate-300';
+                    } else if (p.mendali === 'Perunggu') {
+                      medalBadge = 'bg-orange-100 text-orange-800 border-orange-300';
+                    }
+                    return (
+                      <div key={p.id} className="flex items-center justify-between gap-3 bg-slate-50 border border-gray-200 rounded-xl px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900 truncate">{p.event_kejuaraan}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {p.tingkat_lomba} · {formatTanggal(p.tanggal)}
+                            {p.cabang_cabor?.nama_cabang ? ` · ${p.cabang_cabor.nama_cabang}` : ''}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-extrabold border uppercase tracking-wide ${medalBadge}`}>
+                          {p.mendali}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewingAtlet(null)}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
+              >
+                Tutup
               </button>
             </div>
           </div>

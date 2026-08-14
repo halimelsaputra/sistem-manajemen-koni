@@ -49,6 +49,10 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
 
   // Muat informasi pengguna yang login (peran & wilayah) — dipakai untuk
   // menyembunyikan menu yang tidak diizinkan & menampilkan badge pengguna.
+  // Dep [pathname]: sesi di-refetch setiap pindah halaman. Ini penting karena
+  // setelah login, router.push('/') TIDAK me-remount Navbar (layout persisten),
+  // sehingga tanpa refetch peran super admin tidak pernah terdeteksi →
+  // menu SK & Pengaturan Admin hilang sampai halaman di-refresh manual.
   useEffect(() => {
     let cancelled = false;
     fetch('/api/auth/me')
@@ -63,7 +67,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
       .then((u) => { if (!cancelled) setUser(u); })
       .catch(console.error);
     return () => { cancelled = true; };
-  }, []);
+  }, [pathname]);
 
   // Tutup drawer mobile saat pindah halaman (termasuk tombol back/forward browser).
   // Pola resmi React: sesuaikan state saat render, bukan di dalam effect.
