@@ -1,4 +1,4 @@
-import { AtletRepository } from "@/repositories/atlet.repository";
+import { AtletRepository, type AtletPayload } from "@/repositories/atlet.repository";
 import { ValidationError } from "@/lib/errors";
 import type { Pagination } from "@/lib/pagination";
 
@@ -16,6 +16,57 @@ async function ensureNamaUnik(nama: string, kabupatenKota: string, caborId: numb
     );
     if (dup) {
         throw new ValidationError(`Atlet "${nama}" sudah terdaftar pada cabor dan daerah yang sama.`);
+    }
+}
+
+/**
+ * Validasi ringan field data diri opsional (semua tidak wajib).
+ * @throws ValidationError bila format salah
+ */
+function validateExtraFields(data: AtletPayload) {
+    if (data.nik != null && data.nik.trim() !== "") {
+        const nik = data.nik.replace(/\s/g, "");
+        if (!/^\d{16}$/.test(nik)) {
+            throw new ValidationError("NIK harus berupa 16 digit angka.");
+        }
+        data.nik = nik;
+    } else {
+        data.nik = null;
+    }
+
+    if (data.no_hp != null && data.no_hp.trim() !== "") {
+        const hp = data.no_hp.replace(/[^0-9+]/g, "");
+        if (!/^\+?\d{8,15}$/.test(hp)) {
+            throw new ValidationError("Nomor HP tidak valid (8–15 digit).");
+        }
+        data.no_hp = hp;
+    } else {
+        data.no_hp = null;
+    }
+
+    if (data.jenis_kelamin && data.jenis_kelamin.trim() !== "") {
+        const jk = data.jenis_kelamin.trim();
+        if (!["Laki-laki", "Perempuan"].includes(jk)) {
+            throw new ValidationError("Jenis kelamin harus 'Laki-laki' atau 'Perempuan'.");
+        }
+        data.jenis_kelamin = jk;
+    } else {
+        data.jenis_kelamin = null;
+    }
+
+    if (data.tanggal_lahir) {
+        const d = new Date(data.tanggal_lahir);
+        if (isNaN(d.getTime()) || d > new Date()) {
+            throw new ValidationError("Tanggal lahir tidak valid (tidak boleh di masa depan).");
+        }
+    }
+
+    if (data.berat_badan != null) {
+        const bb = Number(data.berat_badan);
+        if (isNaN(bb) || bb <= 0 || bb > 300) {
+            throw new ValidationError("Berat badan harus angka antara 1–300 kg.");
+        }
+        data.berat_badan = bb;
     }
 }
 
@@ -44,12 +95,13 @@ export const AtletService = {
      * Membuat atlet baru.
      * @param data Payload data atlet
      */
-    async create(data: { nama_atlet: string; kabupaten_kota: string; cabor_id: number }) {
+    async create(data: AtletPayload) {
         // Validasi dasar
         if (!data.nama_atlet || !data.kabupaten_kota || !data.cabor_id) {
             throw new ValidationError("Field nama_atlet, kabupaten_kota, dan cabor_id wajib diisi.");
         }
         const nama = data.nama_atlet.trim();
+        validateExtraFields(data);
         await ensureNamaUnik(nama, data.kabupaten_kota.trim(), data.cabor_id);
         return await AtletRepository.create({ ...data, nama_atlet: nama });
     },
@@ -59,7 +111,7 @@ export const AtletService = {
      * @param id ID Atlet
      * @param data Payload update
      */
-    async update(id: string, data: Partial<{ nama_atlet: string; kabupaten_kota: string; cabor_id: number }>) {
+    async update(id: string, data: Partial<AtletPayload>) {
         // Nilai efektif nama, daerah, & cabor (payload ?? nilai existing) untuk cek duplikat
         const existing = await AtletRepository.findById(id);
         const effNama = (data.nama_atlet ?? existing?.nama_atlet ?? "").trim();
@@ -68,6 +120,7 @@ export const AtletService = {
         if (effNama && effDaerah && effCaborId != null) {
             await ensureNamaUnik(effNama, effDaerah, effCaborId, id);
         }
+        validateExtraFields(data as AtletPayload);
         return await AtletRepository.update(id, data);
     },
 

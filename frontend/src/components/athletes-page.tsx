@@ -15,7 +15,9 @@ import {
   Eye,
   Loader2,
   Check,
-  MapPin
+  MapPin,
+  Camera,
+  User
 } from 'lucide-react';
 import { MOCK_REGIONS } from '@/data/mockData';
 import { Card } from '@/components/ui/card';
@@ -39,6 +41,14 @@ interface Atlet {
   nama_atlet: string;
   kabupaten_kota: string;
   cabor_id: number;
+  nik?: string | null;
+  jenis_kelamin?: string | null;
+  tempat_lahir?: string | null;
+  tanggal_lahir?: string | null;
+  no_hp?: string | null;
+  berat_badan?: number | null;
+  alamat_lengkap?: string | null;
+  foto_url?: string | null;
 }
 
 interface Prestasi {
@@ -101,6 +111,16 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
   const [newAtletNama, setNewAtletNama] = useState('');
   const [newAtletDaerah, setNewAtletDaerah] = useState('Banda Aceh');
   const [newAtletCabor, setNewAtletCabor] = useState('');
+  const [newAtletJenisKelamin, setNewAtletJenisKelamin] = useState('Laki-laki');
+  const [newAtletNik, setNewAtletNik] = useState('');
+  const [newAtletTempatLahir, setNewAtletTempatLahir] = useState('');
+  const [newAtletTanggalLahir, setNewAtletTanggalLahir] = useState('');
+  const [newAtletNoHp, setNewAtletNoHp] = useState('');
+  const [newAtletBeratBadan, setNewAtletBeratBadan] = useState('');
+  const [newAtletAlamat, setNewAtletAlamat] = useState('');
+  const [newAtletFotoFile, setNewAtletFotoFile] = useState<File | null>(null);
+  const [newAtletFotoPreview, setNewAtletFotoPreview] = useState('');
+  const [newAtletFotoUrl, setNewAtletFotoUrl] = useState(''); // path foto existing (saat edit)
   
   const [newCaborNama, setNewCaborNama] = useState('');
   const [newCabangNama, setNewCabangNama] = useState('');
@@ -572,14 +592,37 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
     );
     if (atletDup) return alert(`Atlet "${namaAtlet}" sudah terdaftar pada cabor dan daerah yang sama.`);
 
-    const payload = {
-      nama_atlet: newAtletNama,
-      kabupaten_kota: newAtletDaerah,
-      cabor_id: selCabor.id
-    };
-
     setAtletSaving(true);
     try {
+      // Upload foto baru bila ada file yang dipilih (path disimpan ke kolom foto_url)
+      let fotoUrl = editingAtlet?.foto_url || newAtletFotoUrl || '';
+      if (newAtletFotoFile) {
+        const fd = new FormData();
+        fd.append('file', newAtletFotoFile);
+        const upRes = await fetch('/api/atlet/upload', { method: 'POST', body: fd });
+        const upData = await upRes.json().catch(() => ({}));
+        if (!upRes.ok) {
+          alert(upData.message || 'Gagal mengunggah foto');
+          setAtletSaving(false);
+          return;
+        }
+        fotoUrl = upData.data?.path || fotoUrl;
+      }
+
+      const payload = {
+        nama_atlet: newAtletNama,
+        kabupaten_kota: newAtletDaerah,
+        cabor_id: selCabor.id,
+        nik: newAtletNik.trim() || null,
+        jenis_kelamin: newAtletJenisKelamin,
+        tempat_lahir: newAtletTempatLahir.trim() || null,
+        tanggal_lahir: newAtletTanggalLahir || null,
+        no_hp: newAtletNoHp.trim() || null,
+        berat_badan: newAtletBeratBadan ? Number(newAtletBeratBadan) : null,
+        alamat_lengkap: newAtletAlamat.trim() || null,
+        foto_url: fotoUrl || null
+      };
+
       const res = editingAtlet
         ? await fetch(`/api/atlet/${editingAtlet.id}`, {
             method: 'PUT',
@@ -609,10 +652,46 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
     }
   };
 
+  // Reset semua field form atlet (dipakai saat membuka modal tambah)
+  const resetAtletForm = () => {
+    setNewAtletNama('');
+    setNewAtletDaerah('Banda Aceh');
+    setNewAtletCabor('');
+    setNewAtletJenisKelamin('Laki-laki');
+    setNewAtletNik('');
+    setNewAtletTempatLahir('');
+    setNewAtletTanggalLahir('');
+    setNewAtletNoHp('');
+    setNewAtletBeratBadan('');
+    setNewAtletAlamat('');
+    setNewAtletFotoFile(null);
+    setNewAtletFotoPreview('');
+    setNewAtletFotoUrl('');
+  };
+
+  // Handler pemilihan file foto: validasi tipe/ukuran + buat preview
+  const handleAtletFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const okTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!okTypes.includes(file.type)) {
+      alert('Hanya file gambar JPG, PNG, atau WebP yang diperbolehkan.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Ukuran foto maksimal 2MB.');
+      e.target.value = '';
+      return;
+    }
+    setNewAtletFotoFile(file);
+    setNewAtletFotoPreview(URL.createObjectURL(file));
+  };
+
   // Buka modal tambah atlet (mode tambah + reset form)
   const openAddAtletModal = () => {
     setEditingAtlet(null);
-    setNewAtletNama('');
+    resetAtletForm();
     setShowAtletModal(true);
   };
 
@@ -623,6 +702,16 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
     setNewAtletDaerah(a.kabupaten_kota);
     const cn = caborList.find(c => c.id === a.cabor_id)?.nama_cabor;
     if (cn) setNewAtletCabor(cn);
+    setNewAtletJenisKelamin(a.jenis_kelamin || 'Laki-laki');
+    setNewAtletNik(a.nik || '');
+    setNewAtletTempatLahir(a.tempat_lahir || '');
+    setNewAtletTanggalLahir(a.tanggal_lahir || '');
+    setNewAtletNoHp(a.no_hp || '');
+    setNewAtletBeratBadan(a.berat_badan ? String(a.berat_badan) : '');
+    setNewAtletAlamat(a.alamat_lengkap || '');
+    setNewAtletFotoFile(null);
+    setNewAtletFotoPreview('');
+    setNewAtletFotoUrl(a.foto_url || '');
     setShowAtletModal(true);
   };
 
@@ -1046,7 +1135,28 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               const caborName = caborList.find(c => c.id === a.cabor_id)?.nama_cabor || 'Unknown';
               return (
                 <tr key={a.id} className="hover:bg-slate-50/60 transition">
-                  <td className="py-3 px-6 font-bold text-gray-900">{a.nama_atlet}</td>
+                  <td className="py-3 px-6">
+                    <div className="flex items-center gap-3">
+                      <div className="shrink-0 w-9 h-9 rounded-full bg-slate-100 border border-gray-200 overflow-hidden flex items-center justify-center">
+                        {a.foto_url ? (
+                          <img
+                            src={`/api/atlet/${a.id}/foto`}
+                            alt={`Foto ${a.nama_atlet}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <User className="w-4 h-4 text-gray-300" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900">{a.nama_atlet}</p>
+                        {a.jenis_kelamin && (
+                          <p className="text-xs text-gray-400 font-medium">{a.jenis_kelamin}</p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
                   <td className="py-3 px-6 text-gray-600 font-medium">{a.kabupaten_kota}</td>
                   <td className="py-3 px-6 font-semibold text-gray-800">{caborName}</td>
                   <td className="py-3 px-6 text-right">
@@ -1515,7 +1625,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
       {/* Tambah Atlet Modal */}
       {showAtletModal && mounted && createPortal(
         <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col">
+          <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
             <div className="bg-white text-gray-900 border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2">
                 <UserPlus className="w-5 h-5 text-[#b91c1c]" />
@@ -1530,7 +1640,48 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               </button>
             </div>
 
-            <form onSubmit={handleSaveAtlet} className="p-6 space-y-5">
+            <form onSubmit={handleSaveAtlet} className="p-6 space-y-5 overflow-y-auto">
+              {/* Foto atlet */}
+              <div className="flex items-center gap-4">
+                <div className="shrink-0 w-20 h-20 rounded-2xl bg-slate-100 border border-gray-200 overflow-hidden flex items-center justify-center">
+                  {newAtletFotoPreview ? (
+                    <img src={newAtletFotoPreview} alt="Preview foto" className="w-full h-full object-cover" />
+                  ) : newAtletFotoUrl ? (
+                    <img
+                      src={`/api/atlet/${editingAtlet?.id}/foto`}
+                      alt="Foto atlet"
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <User className="w-8 h-8 text-gray-300" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Foto Atlet</label>
+                  <label className="inline-flex items-center gap-2 cursor-pointer bg-slate-50 border border-gray-200 hover:bg-slate-100 text-gray-700 font-bold text-xs py-2 px-4 rounded-xl transition">
+                    <Camera className="w-4 h-4" />
+                    {newAtletFotoFile ? 'Ganti Foto' : newAtletFotoUrl ? 'Ganti Foto' : 'Pilih Foto'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleAtletFotoChange}
+                    />
+                  </label>
+                  {newAtletFotoFile && (
+                    <button
+                      type="button"
+                      onClick={() => { setNewAtletFotoFile(null); setNewAtletFotoPreview(''); }}
+                      className="block mt-1.5 text-xs font-semibold text-[#b91c1c] hover:underline"
+                    >
+                      Hapus foto baru
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1.5">JPG, PNG, atau WebP · maks 2MB</p>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                   Nama Lengkap <span className="text-red-500">*</span>
@@ -1542,6 +1693,72 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                   onChange={(e) => setNewAtletNama(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <FormSelect
+                    label="Jenis Kelamin"
+                    value={newAtletJenisKelamin}
+                    options={['Laki-laki', 'Perempuan']}
+                    onSelect={setNewAtletJenisKelamin}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">NIK</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={16}
+                    placeholder="16 digit NIK"
+                    value={newAtletNik}
+                    onChange={(e) => setNewAtletNik(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Tempat Lahir</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Banda Aceh"
+                    value={newAtletTempatLahir}
+                    onChange={(e) => setNewAtletTempatLahir(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Tanggal Lahir</label>
+                  <input
+                    type="date"
+                    value={newAtletTanggalLahir}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setNewAtletTanggalLahir(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">No. HP</label>
+                  <input
+                    type="tel"
+                    placeholder="Contoh: 081234567890"
+                    value={newAtletNoHp}
+                    onChange={(e) => setNewAtletNoHp(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Berat Badan (kg)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="300"
+                    step="0.1"
+                    placeholder="Contoh: 60.5"
+                    value={newAtletBeratBadan}
+                    onChange={(e) => setNewAtletBeratBadan(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  />
+                </div>
               </div>
 
               <div>
@@ -1570,6 +1787,17 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                     onSelect={setNewAtletDaerah}
                   />
                 )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Alamat Lengkap</label>
+                <textarea
+                  rows={2}
+                  placeholder="Desa, kecamatan, jalan, dsb."
+                  value={newAtletAlamat}
+                  onChange={(e) => setNewAtletAlamat(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition resize-none"
+                />
               </div>
             </form>
 
@@ -1616,23 +1844,61 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
 
             <div className="overflow-y-auto flex-1 p-6">
               {/* Biodata */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Nama Atlet</p>
-                  <p className="font-bold text-gray-900">{viewingAtlet.nama_atlet}</p>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="shrink-0 w-16 h-16 rounded-2xl bg-slate-100 border border-gray-200 overflow-hidden flex items-center justify-center">
+                  {viewingAtlet.foto_url ? (
+                    <img
+                      src={`/api/atlet/${viewingAtlet.id}/foto`}
+                      alt={`Foto ${viewingAtlet.nama_atlet}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <User className="w-7 h-7 text-gray-300" />
+                  )}
                 </div>
-                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Daerah</p>
-                  <p className="font-bold text-gray-900 flex items-center gap-1.5">
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900 text-lg truncate">{viewingAtlet.nama_atlet}</p>
+                  <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-0.5">
                     <MapPin className="w-3.5 h-3.5 text-[#b91c1c]" />
                     {viewingAtlet.kabupaten_kota}
                   </p>
-                </div>
-                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Cabor</p>
-                  <p className="font-bold text-gray-900">
+                  <p className="text-xs text-gray-400 mt-0.5">
                     {caborList.find(c => c.id === viewingAtlet.cabor_id)?.nama_cabor || 'Unknown'}
                   </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Jenis Kelamin</p>
+                  <p className="font-bold text-gray-900">{viewingAtlet.jenis_kelamin || '-'}</p>
+                </div>
+                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">NIK</p>
+                  <p className="font-bold text-gray-900">{viewingAtlet.nik || '-'}</p>
+                </div>
+                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Tempat / Tanggal Lahir</p>
+                  <p className="font-bold text-gray-900">
+                    {[viewingAtlet.tempat_lahir, viewingAtlet.tanggal_lahir ? formatTanggal(viewingAtlet.tanggal_lahir) : null]
+                      .filter(Boolean)
+                      .join(', ') || '-'}
+                  </p>
+                </div>
+                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">No. HP</p>
+                  <p className="font-bold text-gray-900">{viewingAtlet.no_hp || '-'}</p>
+                </div>
+                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Berat Badan</p>
+                  <p className="font-bold text-gray-900">
+                    {viewingAtlet.berat_badan ? `${viewingAtlet.berat_badan} kg` : '-'}
+                  </p>
+                </div>
+                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Alamat Lengkap</p>
+                  <p className="font-bold text-gray-900">{viewingAtlet.alamat_lengkap || '-'}</p>
                 </div>
               </div>
 

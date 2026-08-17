@@ -26,7 +26,16 @@ const menuItems: MenuItem[] = [
       { label: 'Manajemen Cabor', href: '/athletes/cabor' },
     ],
   },
-  { icon: Home, label: 'Kepengurusan', href: '/management' },
+  {
+    icon: Home,
+    label: 'Kepengurusan',
+    href: '/management',
+    children: [
+      { label: 'Kepengurusan Pemprov', href: '/management' },
+      { label: 'Kepengurusan Kabupaten', href: '/management/kabupaten' },
+      { label: 'Histori Kepengurusan KONI', href: '/management/histori' },
+    ],
+  },
 ]
 
 const generalItems = [

@@ -1,5 +1,5 @@
 import ManagementPage from '@/components/management-page';
 
 export default function Page() {
-  return <ManagementPage section="pemprov" />;
+  return <ManagementPage section="kabupaten" />;
 }

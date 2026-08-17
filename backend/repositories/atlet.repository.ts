@@ -1,5 +1,20 @@
 import { supabase } from "@/lib/supabase";
+import { removeStorageFile } from "@/lib/storage";
 import type { Pagination } from "@/lib/pagination";
+
+export interface AtletPayload {
+    nama_atlet: string;
+    kabupaten_kota: string;
+    cabor_id: number;
+    nik?: string | null;
+    jenis_kelamin?: string | null;
+    tempat_lahir?: string | null;
+    tanggal_lahir?: string | null;
+    no_hp?: string | null;
+    berat_badan?: number | null;
+    alamat_lengkap?: string | null;
+    foto_url?: string | null;
+}
 
 export const AtletRepository = {
     /**
@@ -70,9 +85,9 @@ export const AtletRepository = {
 
     /**
      * Membuat data atlet baru di database.
-     * @param data Payload data atlet { nama_atlet, kabupaten_kota, cabor_id }
+     * @param data Payload data atlet { nama_atlet, kabupaten_kota, cabor_id, nik, jenis_kelamin, ... }
      */
-    async create(data: { nama_atlet: string; kabupaten_kota: string; cabor_id: number }) {
+    async create(data: AtletPayload) {
         const { data: newAtlet, error } = await supabase
             .from("atlet")
             .insert([data])
@@ -91,7 +106,7 @@ export const AtletRepository = {
      * @param id ID Atlet yang akan diupdate
      * @param data Payload data atlet yang diupdate
      */
-    async update(id: string, data: Partial<{ nama_atlet: string; kabupaten_kota: string; cabor_id: number }>) {
+    async update(id: string, data: Partial<AtletPayload>) {
         const { data: updatedAtlet, error } = await supabase
             .from("atlet")
             .update(data)
@@ -131,6 +146,18 @@ export const AtletRepository = {
      * @returns null jika ID tidak ditemukan, selain itu { deleted, cascade }
      */
     async delete(id: string) {
+        // 0) Ambil data atlet dulu untuk mendapatkan path foto (dibersihkan dari storage)
+        const { data: atletRow, error: atletFetchErr } = await supabase
+            .from("atlet")
+            .select("foto_url")
+            .eq("id", id)
+            .maybeSingle();
+
+        if (atletFetchErr) {
+            console.error(`Gagal mengambil foto atlet ${id}:`, atletFetchErr.message);
+            throw atletFetchErr;
+        }
+
         // 1) Ambil & hapus seluruh prestasi milik atlet ini
         const { data: prestasiRows, error: prestasiErr } = await supabase
             .from("prestasi")
@@ -168,6 +195,11 @@ export const AtletRepository = {
         }
 
         if (!deleted || deleted.length === 0) return null; // ID tidak ditemukan
+
+        // 3) Bersihkan foto dari storage (best-effort, tidak menggagalkan penghapusan data)
+        if (atletRow?.foto_url) {
+            await removeStorageFile(atletRow.foto_url, "atlet-photos");
+        }
 
         return { deleted: true, cascade: { prestasi: prestasiIds.length } };
     }
