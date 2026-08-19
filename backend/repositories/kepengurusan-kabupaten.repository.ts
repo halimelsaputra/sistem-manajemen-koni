@@ -31,7 +31,7 @@ export const KepengurusanKabupatenRepository = {
         if (filters?.search) {
             const s = filters.search.replace(/,/g, " ");
             query = query.or(
-                `kabupaten_kota.ilike.%${s}%,ketua_umum.ilike.%${s}%,ketua_harian.ilike.%${s}%,sekretaris.ilike.%${s}%,nomor_sk.ilike.%${s}%`
+                `kabupaten_kota.ilike.%${s}%,ketua_umum.ilike.%${s}%,sekretaris.ilike.%${s}%,nomor_sk.ilike.%${s}%`
             );
         }
 
@@ -83,11 +83,10 @@ export const KepengurusanKabupatenRepository = {
      */
     async create(data: {
         kabupaten_kota: string;
-        masa_bakti: string;
         nomor_sk: string;
         tanggal_sk: string;
+        tanggal_berakhir?: string;
         ketua_umum: string;
-        ketua_harian?: string;
         sekretaris: string;
         file_path_sk?: string;
         status_kepengurusan?: "Aktif" | "Berakhir";
@@ -114,11 +113,10 @@ export const KepengurusanKabupatenRepository = {
         id: string,
         data: Partial<{
             kabupaten_kota: string;
-            masa_bakti: string;
             nomor_sk: string;
             tanggal_sk: string;
+            tanggal_berakhir: string;
             ketua_umum: string;
-            ketua_harian: string;
             sekretaris: string;
             file_path_sk: string;
             status_kepengurusan: "Aktif" | "Berakhir";

@@ -56,7 +56,7 @@ export async function GET(
 /**
  * Endpoint PUT /api/kepengurusan-kabupaten/[id]
  * Memperbarui data kepengurusan kabupaten tertentu berdasarkan ID.
- * Request Body: Partial<{ kabupaten_kota: string, masa_bakti: string, nomor_sk: string, tanggal_sk: string, ketua_umum: string, ketua_harian: string, sekretaris: string, file_path_sk: string, status_kepengurusan: string }>
+ * Request Body: Partial<{ kabupaten_kota: string, nomor_sk: string, tanggal_sk: string, tanggal_berakhir: string, ketua_umum: string, sekretaris: string, file_path_sk: string, status_kepengurusan: string }>
  */
 export async function PUT(
     req: Request,

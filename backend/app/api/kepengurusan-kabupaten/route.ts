@@ -67,7 +67,7 @@ export async function GET(req: Request) {
 /**
  * Endpoint POST /api/kepengurusan-kabupaten
  * Menambahkan data kepengurusan kabupaten baru.
- * Request Body: { kabupaten_kota: string, masa_bakti: string, nomor_sk: string, tanggal_sk: string, ketua_umum: string, ketua_harian?: string, sekretaris: string, file_path_sk?: string, status_kepengurusan?: string }
+ * Request Body: { kabupaten_kota: string, nomor_sk: string, tanggal_sk: string, tanggal_berakhir?: string, ketua_umum: string, sekretaris: string, file_path_sk?: string, status_kepengurusan?: string }
  */
 export async function POST(req: Request) {
     try {

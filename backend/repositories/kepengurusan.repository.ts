@@ -4,56 +4,38 @@ import { removeStorageFile } from "@/lib/storage";
 
 export const KepengurusanRepository = {
     /**
-     * Mengambil data kepengurusan beserta nama cabang olahraga (cabor) dengan filter opsional.
-     * Saat `pagination` diberikan, mengembalikan { items, total }.
-     * @param filters Objek filter { cabor_id, status_kepengurusan, search }
+     * Mengambil data kepengurusan beserta nama pemprov (atau cabor untuk data lama)
+     * dengan filter opsional. Saat `pagination` diberikan, mengembalikan { items, total }.
+     * @param filters Objek filter { pemprov, status_kepengurusan, search }
      * @param pagination Opsional { page, pageSize } — jika diisi, hasil dipotong per halaman.
      */
     async findAll(
-        filters?: { cabor_id?: string; status_kepengurusan?: string; search?: string },
+        filters?: { pemprov?: string; status_kepengurusan?: string; search?: string },
         pagination?: Pagination
     ) {
-        // cabor!inner: join inner agar filter pencarian nama cabor deterministik.
-        // Aman karena cabor_id adalah FK NOT NULL — tidak ada baris kepengurusan tanpa cabor.
-        const selectStr = "*, cabor!inner(nama_cabor)";
+        // cabor(nama_cabor): left join — data lama memakai cabor_id, data baru memakai pemprov.
+        const selectStr = "*, cabor(nama_cabor)";
         let query = pagination
             ? supabase.from("kepengurusan").select(selectStr, { count: "exact" })
             : supabase.from("kepengurusan").select(selectStr);
 
-        if (filters?.cabor_id) {
-            query = query.eq("cabor_id", filters.cabor_id);
+        if (filters?.pemprov) {
+            query = query.eq("pemprov", filters.pemprov);
         }
         if (filters?.status_kepengurusan) {
             query = query.eq("status_kepengurusan", filters.status_kepengurusan);
         }
         if (filters?.search) {
-            // Pencarian sebagian pada nama cabor, ketua_umum, ketua_harian, sekretaris, atau nomor_sk.
-            // PostgREST TIDAK mendukung kolom relasi (cabor.nama_cabor) di dalam or().
-            // Solusi: cari dulu cabor yang namanya cocok, lalu pakai cabor_id.in()
-            // (kolom lokal) di dalam or().
+            // Pencarian sebagian pada nama pemprov, ketua_umum, sekretaris, atau nomor_sk.
+            // Semua kolom lokal — PostgREST or() aman dipakai langsung.
             // Koma dihilangkan agar tidak memecah sintaks or() PostgREST.
             const s = filters.search.replace(/,/g, " ");
-            const { data: matchedCabors, error: caborErr } = await supabase
-                .from("cabor")
-                .select("id")
-                .ilike("nama_cabor", `%${s}%`)
-                .limit(1000);
-
-            if (caborErr) {
-                console.error("Gagal mencari cabor untuk filter search:", caborErr.message);
-                throw caborErr;
-            }
-
             const conditions = [
+                `pemprov.ilike.%${s}%`,
                 `ketua_umum.ilike.%${s}%`,
-                `ketua_harian.ilike.%${s}%`,
                 `sekretaris.ilike.%${s}%`,
                 `nomor_sk.ilike.%${s}%`,
             ];
-            const caborIds = (matchedCabors ?? []).map((c: { id: number }) => c.id);
-            if (caborIds.length > 0) {
-                conditions.push(`cabor_id.in.(${caborIds.join(",")})`);
-            }
             query = query.or(conditions.join(","));
         }
 
@@ -104,12 +86,12 @@ export const KepengurusanRepository = {
      * @param data Payload data kepengurusan
      */
     async create(data: {
-        cabor_id: number;
-        masa_bakti: string;
+        pemprov?: string;
+        cabor_id?: number;
         nomor_sk: string;
         tanggal_sk: string;
+        tanggal_berakhir?: string;
         ketua_umum: string;
-        ketua_harian?: string;
         sekretaris: string;
         file_path_sk?: string;
         status_kepengurusan?: "Aktif" | "Berakhir";
@@ -135,12 +117,12 @@ export const KepengurusanRepository = {
     async update(
         id: string,
         data: Partial<{
+            pemprov: string;
             cabor_id: number;
-            masa_bakti: string;
             nomor_sk: string;
             tanggal_sk: string;
+            tanggal_berakhir: string;
             ketua_umum: string;
-            ketua_harian: string;
             sekretaris: string;
             file_path_sk: string;
             status_kepengurusan: "Aktif" | "Berakhir";
@@ -199,21 +181,21 @@ export const KepengurusanRepository = {
 
     /**
      * Mematikan (status → "Berakhir") seluruh kepengurusan AKTIF lain
-     * pada cabor yang sama, kecuali ID yang dikecualikan.
+     * pada pemprov yang sama, kecuali ID yang dikecualikan.
      * Dipakai saat SK baru dibuat agar hanya SK terbaru yang berstatus Aktif.
-     * @param caborId ID cabor target
+     * @param pemprov Nama pemprov target
      * @param excludeId ID kepengurusan baru yang TIDAK ikut dimatikan
      */
-    async deactivateOthers(caborId: number, excludeId: number) {
+    async deactivateOthers(pemprov: string, excludeId: number) {
         const { error } = await supabase
             .from("kepengurusan")
             .update({ status_kepengurusan: "Berakhir" })
-            .eq("cabor_id", caborId)
+            .eq("pemprov", pemprov)
             .eq("status_kepengurusan", "Aktif")
             .neq("id", excludeId);
 
         if (error) {
-            console.error(`Gagal mematikan kepengurusan lama cabor ${caborId}:`, error.message);
+            console.error(`Gagal mematikan kepengurusan lama pemprov ${pemprov}:`, error.message);
             throw error;
         }
         return true;

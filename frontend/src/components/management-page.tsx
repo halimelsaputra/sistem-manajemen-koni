@@ -22,21 +22,16 @@ import Pagination from '@/components/ui/pagination';
 import ConfirmDeleteModal from '@/components/ui/confirm-delete-modal';
 import { MOCK_REGIONS } from '@/data/mockData';
 
-interface Cabor {
-  id: number;
-  nama_cabor: string;
-}
-
 export interface SKRecord {
   id: number;
   cabor_id?: number;
   cabor?: string; // in case api returns it directly
+  pemprov?: string; // nama organisasi pengurus provinsi (input manual)
   kabupaten_kota?: string;
-  masa_bakti: string;
   nomor_sk: string;
   tanggal_sk: string;
+  tanggal_berakhir?: string;
   ketua_umum: string;
-  ketua_harian?: string;
   sekretaris: string;
   status_kepengurusan: string;
   file_path_sk: string;
@@ -59,16 +54,15 @@ const API_BY_KIND: Record<ManageKind, string> = {
 // ---------------------------------------------------------------
 // Kartu CRUD (Pemprov / Kabupaten) — tambah, edit, hapus, upload PDF
 // ---------------------------------------------------------------
-function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Cabor[] }) {
+function SKManagementCard({ kind }: { kind: ManageKind }) {
   const [skList, setSkList] = useState<SKRecord[]>([]);
 
   // Form state
   const [entity, setEntity] = useState(''); // nama cabor (pemprov) atau kabupaten (kabupaten)
-  const [masaBakti, setMasaBakti] = useState('');
   const [nomorSk, setNomorSk] = useState('');
   const [tanggalSk, setTanggalSk] = useState(new Date().toISOString().split('T')[0]);
+  const [tanggalBerakhir, setTanggalBerakhir] = useState('');
   const [ketuaUmum, setKetuaUmum] = useState('');
-  const [ketuaHarian, setKetuaHarian] = useState('');
   const [sekretaris, setSekretaris] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -154,21 +148,9 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
 
   const handleSaveSK = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nomorSk || !ketuaUmum || !sekretaris) {
-      alert('Mohon lengkapi Nomor SK, Ketua Umum, dan Sekretaris.');
-      return;
-    }
-
-    let entityId: number | undefined;
-    if (kind === 'pemprov') {
-      const selectedCabor = caborList.find(c => c.nama_cabor === entity);
-      if (!selectedCabor) {
-        alert('Cabor tidak valid.');
-        return;
-      }
-      entityId = selectedCabor.id;
-    } else if (!entity) {
-      alert('Wilayah kabupaten/kota harus dipilih.');
+    const entityField = kind === 'pemprov' ? 'Pemprov' : 'Kabupaten / Kota';
+    if (!nomorSk || !ketuaUmum || !sekretaris || !entity) {
+      alert(`Mohon lengkapi ${entityField}, Nomor SK, Ketua Umum, dan Sekretaris.`);
       return;
     }
 
@@ -195,17 +177,16 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
 
       // 2) Simpan/perbarui data SK beserta path file di storage
       const payload: any = {
-        masa_bakti: masaBakti,
         nomor_sk: nomorSk,
         tanggal_sk: tanggalSk,
+        tanggal_berakhir: tanggalBerakhir || undefined,
         ketua_umum: ketuaUmum,
-        ketua_harian: ketuaHarian || undefined,
         sekretaris: sekretaris,
         status_kepengurusan: editingSK?.status_kepengurusan || 'Aktif',
         file_path_sk: filePath
       };
       if (kind === 'pemprov') {
-        payload.cabor_id = entityId;
+        payload.pemprov = entity;
       } else {
         payload.kabupaten_kota = entity;
       }
@@ -225,9 +206,9 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
         const wasEdit = !!editingSK;
         setNomorSk('');
         setKetuaUmum('');
-        setKetuaHarian('');
         setSekretaris('');
-        setMasaBakti('');
+        setTanggalBerakhir('');
+        setEntity('');
         setSelectedFile(null);
         setEditingSK(null);
         setSuccessIsEdit(wasEdit);
@@ -249,12 +230,11 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
   const openAddSKModal = () => {
     setEditingSK(null);
     setSuccessIsEdit(false);
-    setEntity(kind === 'pemprov' ? (caborList[0]?.nama_cabor || '') : '');
-    setMasaBakti('');
+    setEntity('');
     setNomorSk('');
     setTanggalSk(new Date().toISOString().split('T')[0]);
+    setTanggalBerakhir('');
     setKetuaUmum('');
-    setKetuaHarian('');
     setSekretaris('');
     setSelectedFile(null);
     setShowInputModal(true);
@@ -264,16 +244,16 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
   const openEditSK = (sk: SKRecord) => {
     setEditingSK(sk);
     if (kind === 'pemprov') {
-      const cn = caborList.find(c => c.id === sk.cabor_id)?.nama_cabor;
-      setEntity(cn || caborList[0]?.nama_cabor || '');
+      const apiCabor: any = sk.cabor;
+      const extractedCabor = apiCabor && typeof apiCabor === 'object' ? apiCabor.nama_cabor : apiCabor;
+      setEntity(sk.pemprov || extractedCabor || '');
     } else {
       setEntity(sk.kabupaten_kota || '');
     }
-    setMasaBakti(sk.masa_bakti || '');
     setNomorSk(sk.nomor_sk || '');
     setTanggalSk((sk.tanggal_sk || new Date().toISOString().split('T')[0]).slice(0, 10));
+    setTanggalBerakhir((sk.tanggal_berakhir || '').slice(0, 10));
     setKetuaUmum(sk.ketua_umum || '');
-    setKetuaHarian(sk.ketua_harian || '');
     setSekretaris(sk.sekretaris || '');
     setSelectedFile(null);
     setShowInputModal(true);
@@ -319,15 +299,15 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
     window.open(`${apiBase}/${sk.id}/download`, '_blank');
   };
 
-  // Nama entitas untuk baris tabel (cabor untuk pemprov, kabupaten untuk kabupaten)
+  // Nama entitas untuk baris tabel (pemprov untuk pemprov, kabupaten untuk kabupaten)
   const entityNameOf = (sk: SKRecord) => {
     if (kind === 'kabupaten') return sk.kabupaten_kota || 'N/A';
     const apiCabor: any = sk.cabor;
     const extracted = apiCabor && typeof apiCabor === 'object' ? apiCabor.nama_cabor : apiCabor;
-    return caborList.find(c => c.id === sk.cabor_id)?.nama_cabor || extracted || 'N/A';
+    return sk.pemprov || extracted || 'N/A';
   };
 
-  const entityLabel = kind === 'pemprov' ? 'Cabor' : 'Kabupaten / Kota';
+  const entityLabel = kind === 'pemprov' ? 'Pemprov' : 'Kabupaten / Kota';
   const cardTitle = kind === 'pemprov' ? 'Kepengurusan Pemprov' : 'Kepengurusan Kabupaten';
 
   return (
@@ -413,32 +393,24 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
             <thead className="sticky top-0 z-10 bg-slate-50">
               <tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
                 <th className="py-3.5 px-6">{entityLabel}</th>
-                <th className="py-3.5 px-6">Masa Bakti</th>
                 <th className="py-3.5 px-6">No. SK</th>
+                <th className="py-3.5 px-6">Tanggal Penetapan</th>
+                <th className="py-3.5 px-6">Tanggal Berakhir</th>
                 <th className="py-3.5 px-6">Ketua Umum</th>
-                <th className="py-3.5 px-6">Status</th>
-                <th className="py-3.5 px-6 text-right">Aksi</th>
+                <th className="py-3.5 px-6">Sekretaris</th>
+                <th className="py-3.5 px-6 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
               {skList.map((sk) => {
-                const isAktif = sk.status_kepengurusan === 'Aktif';
                 return (
-                  <tr key={sk.id} className="hover:bg-slate-50/60 transition">
+                <tr key={sk.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-6 font-bold text-gray-900">{entityNameOf(sk)}</td>
-                    <td className="py-3.5 px-6 text-gray-600 font-medium">{sk.masa_bakti}</td>
                     <td className="py-3.5 px-6 font-mono text-xs font-semibold text-gray-700">{sk.nomor_sk}</td>
-                    <td className="py-3.5 px-6 font-medium text-gray-800">{sk.ketua_umum}</td>
-                    <td className="py-3.5 px-6">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold border ${isAktif
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-gray-100 text-gray-600 border-gray-200'
-                          }`}
-                      >
-                        {sk.status_kepengurusan || 'Unknown'}
-                      </span>
-                    </td>
+                    <td className="py-3.5 px-6 font-semibold text-gray-900">{(sk.tanggal_sk || '').slice(0, 10)}</td>
+                    <td className="py-3.5 px-6 font-semibold text-gray-900">{(sk.tanggal_berakhir || '').slice(0, 10)}</td>
+                    <td className="py-3.5 px-6 font-semibold text-gray-900">{sk.ketua_umum}</td>
+                    <td className="py-3.5 px-6 font-semibold text-gray-900">{sk.sekretaris || 'N/A'}</td>
                     <td className="py-3.5 px-6 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
@@ -475,7 +447,7 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
               })}
               {skList.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-400 text-sm">
+                  <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">
                     Tidak ada arsip SK yang cocok dengan pencarian Anda.
                   </td>
                 </tr>
@@ -515,17 +487,22 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
               </button>
             </div>
 
-            <form onSubmit={handleSaveSK} className="p-6 space-y-6 overflow-y-auto">
+            <form id={`form-sk-${kind}`} onSubmit={handleSaveSK} className="p-6 space-y-6 overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   {kind === 'pemprov' ? (
-                    <FormSelect
-                      label="Cabang Olahraga"
-                      required
-                      value={entity}
-                      options={caborList.map(c => c.nama_cabor)}
-                      onSelect={setEntity}
-                    />
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                        Pemprov <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Pengprov PSSI Aceh"
+                        value={entity}
+                        onChange={(e) => setEntity(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                      />
+                    </div>
                   ) : (
                     <FormSelect
                       label="Kabupaten / Kota"
@@ -537,19 +514,6 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
                       onSelect={setEntity}
                     />
                   )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                    Masa Bakti <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: 2024-2028"
-                    value={masaBakti}
-                    onChange={(e) => setMasaBakti(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
-                  />
                 </div>
 
                 <div>
@@ -581,6 +545,21 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    Tanggal Berakhir <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={tanggalBerakhir}
+                      onChange={(e) => setTanggalBerakhir(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">Dipakai untuk peringatan kedaluwarsa SK (Early Warning System).</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                     Ketua Umum <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -588,24 +567,11 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
                     placeholder="Nama Lengkap"
                     value={ketuaUmum}
                     onChange={(e) => setKetuaUmum(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                    Ketua Harian
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Nama Lengkap (Opsional)"
-                    value={ketuaHarian}
-                    onChange={(e) => setKetuaHarian(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                     Sekretaris <span className="text-red-500">*</span>
                   </label>
@@ -614,7 +580,7 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
                     placeholder="Nama Lengkap"
                     value={sekretaris}
                     onChange={(e) => setSekretaris(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
                   />
                 </div>
               </div>
@@ -672,6 +638,7 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
               </button>
               <button
                 type="submit"
+                form={`form-sk-${kind}`}
                 className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
               >
                 <Save className="w-4 h-4" />
@@ -688,7 +655,7 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
         open={deleteTarget !== null}
         title={`Hapus SK ${kind === 'pemprov' ? 'Kepengurusan Pemprov' : 'Kepengurusan Kabupaten'}`}
         description={deleteTarget
-          ? `Anda akan menghapus arsip SK "${deleteTarget.nomor_sk}" periode ${deleteTarget.masa_bakti} (Ketua Umum: ${deleteTarget.ketua_umum}).`
+          ? `Anda akan menghapus arsip SK "${deleteTarget.nomor_sk}" (Ketua Umum: ${deleteTarget.ketua_umum}).`
           : ''}
         impact={deleteImpact}
         confirmPhrase={deleteTarget ? `hapus sk ${deleteTarget.nomor_sk}` : ''}
@@ -703,7 +670,7 @@ function SKManagementCard({ kind, caborList }: { kind: ManageKind; caborList: Ca
 // ---------------------------------------------------------------
 // Kartu Histori (read-only) — arsip SK Berakhir, pemprov & kabupaten
 // ---------------------------------------------------------------
-function SKHistoriCard({ kind, caborList }: { kind: ManageKind; caborList: Cabor[] }) {
+function SKHistoriCard({ kind }: { kind: ManageKind }) {
   const [skList, setSkList] = useState<SKRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -757,10 +724,10 @@ function SKHistoriCard({ kind, caborList }: { kind: ManageKind; caborList: Cabor
     if (kind === 'kabupaten') return sk.kabupaten_kota || 'N/A';
     const apiCabor: any = sk.cabor;
     const extracted = apiCabor && typeof apiCabor === 'object' ? apiCabor.nama_cabor : apiCabor;
-    return caborList.find(c => c.id === sk.cabor_id)?.nama_cabor || extracted || 'N/A';
+    return sk.pemprov || extracted || 'N/A';
   };
 
-  const entityLabel = kind === 'pemprov' ? 'Cabor' : 'Kabupaten / Kota';
+  const entityLabel = kind === 'pemprov' ? 'Pemprov' : 'Kabupaten / Kota';
   const cardTitle = kind === 'pemprov' ? 'Histori Kepengurusan Pemprov' : 'Histori Kepengurusan Kabupaten';
 
   return (
@@ -805,25 +772,23 @@ function SKHistoriCard({ kind, caborList }: { kind: ManageKind; caborList: Cabor
           <thead className="sticky top-0 z-10 bg-slate-50">
             <tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
               <th className="py-3.5 px-6">{entityLabel}</th>
-              <th className="py-3.5 px-6">Masa Bakti</th>
               <th className="py-3.5 px-6">No. SK</th>
+              <th className="py-3.5 px-6">Tanggal Penetapan</th>
+              <th className="py-3.5 px-6">Tanggal Berakhir</th>
               <th className="py-3.5 px-6">Ketua Umum</th>
-              <th className="py-3.5 px-6">Status</th>
-              <th className="py-3.5 px-6 text-right">Aksi</th>
+              <th className="py-3.5 px-6">Sekretaris</th>
+              <th className="py-3.5 px-6 text-center">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-sm">
             {skList.map((sk) => (
               <tr key={sk.id} className="hover:bg-slate-50/60 transition">
                 <td className="py-3.5 px-6 font-bold text-gray-900">{entityNameOf(sk)}</td>
-                <td className="py-3.5 px-6 text-gray-600 font-medium">{sk.masa_bakti}</td>
                 <td className="py-3.5 px-6 font-mono text-xs font-semibold text-gray-700">{sk.nomor_sk}</td>
-                <td className="py-3.5 px-6 font-medium text-gray-800">{sk.ketua_umum}</td>
-                <td className="py-3.5 px-6">
-                  <span className="px-3 py-1 rounded-full text-xs font-bold border bg-gray-100 text-gray-600 border-gray-200">
-                    {sk.status_kepengurusan || 'Unknown'}
-                  </span>
-                </td>
+                <td className="py-3.5 px-6 font-semibold text-gray-900">{(sk.tanggal_sk || '').slice(0, 10)}</td>
+                <td className="py-3.5 px-6 font-semibold text-gray-900">{(sk.tanggal_berakhir || '').slice(0, 10)}</td>
+                <td className="py-3.5 px-6 font-semibold text-gray-900">{sk.ketua_umum}</td>
+                <td className="py-3.5 px-6 font-semibold text-gray-900">{sk.sekretaris || 'N/A'}</td>
                 <td className="py-3.5 px-6 text-right">
                   <div className="flex items-center justify-end">
                     <button
@@ -851,7 +816,7 @@ function SKHistoriCard({ kind, caborList }: { kind: ManageKind; caborList: Cabor
             ))}
             {skList.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-gray-400 text-sm">
+                <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">
                   Belum ada arsip histori yang cocok dengan pencarian Anda.
                 </td>
               </tr>
@@ -877,18 +842,6 @@ function SKHistoriCard({ kind, caborList }: { kind: ManageKind; caborList: Cabor
 // Halaman utama — memilih kartu berdasarkan section
 // ---------------------------------------------------------------
 export default function ManagementPage({ section = 'pemprov' }: { section?: Section }) {
-  const [caborList, setCaborList] = useState<Cabor[]>([]);
-
-  useEffect(() => {
-    fetch('/api/cabor')
-      .then(res => res.json())
-      .then(data => {
-        const arr = Array.isArray(data) ? data : data.data || [];
-        setCaborList(arr);
-      })
-      .catch(err => console.error("Error fetching cabor:", err));
-  }, []);
-
   const isHistori = section === 'histori';
   const manageKind: ManageKind = section === 'kabupaten' ? 'kabupaten' : 'pemprov';
 
@@ -908,11 +861,11 @@ export default function ManagementPage({ section = 'pemprov' }: { section?: Sect
             <History className="w-4 h-4" />
             <span>Arsip Histori Kepengurusan (status Berakhir)</span>
           </div>
-          <SKHistoriCard kind="pemprov" caborList={caborList} />
-          <SKHistoriCard kind="kabupaten" caborList={caborList} />
+          <SKHistoriCard kind="pemprov" />
+          <SKHistoriCard kind="kabupaten" />
         </>
       ) : (
-        <SKManagementCard kind={manageKind} caborList={caborList} />
+        <SKManagementCard kind={manageKind} />
       )}
     </div>
   );

@@ -33,18 +33,17 @@ export const KepengurusanKabupatenService = {
      */
     async create(data: {
         kabupaten_kota: string;
-        masa_bakti: string;
         nomor_sk: string;
         tanggal_sk: string;
+        tanggal_berakhir?: string;
         ketua_umum: string;
-        ketua_harian?: string;
         sekretaris: string;
         file_path_sk?: string;
         status_kepengurusan?: "Aktif" | "Berakhir";
     }) {
         // Validasi field wajib
-        if (!data.kabupaten_kota || !data.masa_bakti || !data.nomor_sk || !data.tanggal_sk || !data.ketua_umum || !data.sekretaris) {
-            throw new ValidationError("Field kabupaten_kota, masa_bakti, nomor_sk, tanggal_sk, ketua_umum, dan sekretaris wajib diisi.");
+        if (!data.kabupaten_kota || !data.nomor_sk || !data.tanggal_sk || !data.tanggal_berakhir || !data.ketua_umum || !data.sekretaris) {
+            throw new ValidationError("Field kabupaten_kota, nomor_sk, tanggal_sk, tanggal_berakhir, ketua_umum, dan sekretaris wajib diisi.");
         }
 
         // Validasi status_kepengurusan
@@ -57,11 +56,10 @@ export const KepengurusanKabupatenService = {
 
         const newKepengurusan = await KepengurusanKabupatenRepository.create({
             kabupaten_kota: data.kabupaten_kota.trim(),
-            masa_bakti: data.masa_bakti.trim(),
             nomor_sk: data.nomor_sk.trim(),
             tanggal_sk: data.tanggal_sk,
+            tanggal_berakhir: data.tanggal_berakhir,
             ketua_umum: data.ketua_umum.trim(),
-            ketua_harian: data.ketua_harian?.trim(),
             sekretaris: data.sekretaris.trim(),
             file_path_sk: data.file_path_sk?.trim(),
             status_kepengurusan: data.status_kepengurusan || "Aktif"
@@ -91,11 +89,10 @@ export const KepengurusanKabupatenService = {
         id: string,
         data: Partial<{
             kabupaten_kota: string;
-            masa_bakti: string;
             nomor_sk: string;
             tanggal_sk: string;
+            tanggal_berakhir: string;
             ketua_umum: string;
-            ketua_harian: string;
             sekretaris: string;
             file_path_sk: string;
             status_kepengurusan: "Aktif" | "Berakhir";
@@ -111,12 +108,11 @@ export const KepengurusanKabupatenService = {
 
         const payload: any = { ...data };
         if (data.kabupaten_kota) payload.kabupaten_kota = data.kabupaten_kota.trim();
-        if (data.masa_bakti) payload.masa_bakti = data.masa_bakti.trim();
         if (data.nomor_sk) payload.nomor_sk = data.nomor_sk.trim();
         if (data.ketua_umum) payload.ketua_umum = data.ketua_umum.trim();
-        if (data.ketua_harian) payload.ketua_harian = data.ketua_harian.trim();
         if (data.sekretaris) payload.sekretaris = data.sekretaris.trim();
         if (data.file_path_sk) payload.file_path_sk = data.file_path_sk.trim();
+        if (data.tanggal_berakhir) payload.tanggal_berakhir = data.tanggal_berakhir;
 
         const updated = await KepengurusanKabupatenRepository.update(id, payload);
 

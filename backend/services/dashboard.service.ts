@@ -51,34 +51,33 @@ function computeSkWarnings(activeKepengurusan: any[]): any[] {
     const now = new Date();
 
     activeKepengurusan.forEach((kep: any) => {
-        if (kep.tanggal_sk && kep.masa_bakti) {
-            // Ekstrak tahun berakhir dari masa bakti (contoh: "2020-2024" -> 2024)
-            const years = kep.masa_bakti.split("-");
-            const endYearStr = years[years.length - 1].trim();
-            const endYear = parseInt(endYearStr);
+        // Tanggal kedaluwarsa berasal dari kolom tanggal_berakhir (akurat).
+        // Data lama sudah di-backfill saat migrasi 016 dijalankan.
+        let expiryDate: Date | null = null;
 
-            if (!isNaN(endYear)) {
-                const docDate = new Date(kep.tanggal_sk);
-                // Tanggal kadaluarsa: tanggal & bulan SK pada tahun akhir masa bakti
-                const expiryDate = new Date(endYear, docDate.getMonth(), docDate.getDate());
+        if (kep.tanggal_berakhir) {
+            const parsed = new Date(kep.tanggal_berakhir);
+            if (!isNaN(parsed.getTime())) {
+                expiryDate = parsed;
+            }
+        }
 
-                // Hitung selisih waktu
-                const diffTime = expiryDate.getTime() - now.getTime();
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (expiryDate) {
+            const diffTime = expiryDate.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-                // Peringatan jika sudah kedaluwarsa atau akan kedaluwarsa dalam 3 bulan (90 hari)
-                if (diffDays <= 90) {
-                    skWarnings.push({
-                        id: kep.id,
-                        cabor: kep.cabor?.nama_cabor || "Tidak Diketahui",
-                        nomor_sk: kep.nomor_sk,
-                        tanggal_sk: kep.tanggal_sk,
-                        masa_bakti: kep.masa_bakti,
-                        expiry_date: expiryDate.toISOString().split("T")[0],
-                        days_remaining: diffDays,
-                        is_expired: diffDays < 0
-                    });
-                }
+            // Peringatan jika sudah kedaluwarsa atau akan kedaluwarsa dalam 3 bulan (90 hari)
+            if (diffDays <= 90) {
+                skWarnings.push({
+                    id: kep.id,
+                    cabor: kep.pemprov || kep.cabor?.nama_cabor || "Tidak Diketahui",
+                    nomor_sk: kep.nomor_sk,
+                    tanggal_sk: kep.tanggal_sk,
+                    tanggal_berakhir: kep.tanggal_berakhir,
+                    expiry_date: expiryDate.toISOString().split("T")[0],
+                    days_remaining: diffDays,
+                    is_expired: diffDays < 0
+                });
             }
         }
     });

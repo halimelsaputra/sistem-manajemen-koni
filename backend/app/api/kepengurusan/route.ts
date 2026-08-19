@@ -18,13 +18,13 @@ export async function GET(req: Request) {
         }
 
         const { searchParams } = new URL(req.url);
-        const cabor_id = searchParams.get("cabor_id") || undefined;
+        const pemprov = searchParams.get("pemprov") || undefined;
         const status_kepengurusan = searchParams.get("status_kepengurusan") || undefined;
         const search = searchParams.get("search") || undefined;
         const pagination = parsePagination(searchParams);
 
         const result = await KepengurusanService.getAll(
-            { cabor_id, status_kepengurusan, search },
+            { pemprov, status_kepengurusan, search },
             pagination ?? undefined
         );
 
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
 /**
  * Endpoint POST /api/kepengurusan
  * Menambahkan data kepengurusan baru.
- * Request Body: { cabor_id: number, masa_bakti: string, nomor_sk: string, tanggal_sk: string, ketua_umum: string, ketua_harian?: string, sekretaris: string, file_path_sk?: string, status_kepengurusan?: string }
+ * Request Body: { pemprov?: string, cabor_id?: number, nomor_sk: string, tanggal_sk: string, tanggal_berakhir?: string, ketua_umum: string, sekretaris: string, file_path_sk?: string, status_kepengurusan?: string }
  */
 export async function POST(req: Request) {
     try {

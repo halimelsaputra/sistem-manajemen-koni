@@ -51,7 +51,7 @@ interface DashboardData {
   totalPrestasi: number;
   totalKepengurusan: number;
   medalsByRegion: { kabupaten_kota: string; total_emas: number; total_perak: number; total_perunggu: number }[];
-  skWarnings: { id: number; cabor: string; nomor_sk: string; tanggal_sk: string; masa_bakti: string; expiry_date: string; days_remaining: number; is_expired: boolean }[];
+  skWarnings: { id: number; cabor: string; nomor_sk: string; tanggal_sk: string; tanggal_berakhir: string; expiry_date: string; days_remaining: number; is_expired: boolean }[];
 }
 
 interface ExpiringSK {

@@ -124,7 +124,7 @@ export const DashboardRepository = {
     async getActiveKepengurusan() {
         const { data, error } = await supabase
             .from("kepengurusan")
-            .select("id, nomor_sk, tanggal_sk, masa_bakti, status_kepengurusan, cabor(nama_cabor)")
+            .select("id, nomor_sk, tanggal_sk, tanggal_berakhir, pemprov, status_kepengurusan, cabor(nama_cabor)")
             .eq("status_kepengurusan", "Aktif");
 
         if (error) {

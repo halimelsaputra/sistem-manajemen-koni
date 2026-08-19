@@ -56,7 +56,7 @@ export async function GET(
 /**
  * Endpoint PUT /api/kepengurusan/[id]
  * Memperbarui data kepengurusan tertentu berdasarkan ID.
- * Request Body: Partial<{ cabor_id: number, masa_bakti: string, nomor_sk: string, tanggal_sk: string, ketua_umum: string, ketua_harian: string, sekretaris: string, file_path_sk: string, status_kepengurusan: string }>
+ * Request Body: Partial<{ pemprov: string, cabor_id: number, nomor_sk: string, tanggal_sk: string, tanggal_berakhir: string, ketua_umum: string, sekretaris: string, file_path_sk: string, status_kepengurusan: string }>
  */
 export async function PUT(
     req: Request,

@@ -9,7 +9,7 @@ export const KepengurusanService = {
      * @param pagination Opsional { page, pageSize } — jika diisi, hasil { items, total }.
      */
     async getAll(
-        filters?: { cabor_id?: string; status_kepengurusan?: string; search?: string },
+        filters?: { pemprov?: string; status_kepengurusan?: string; search?: string },
         pagination?: Pagination
     ) {
         return await KepengurusanRepository.findAll(filters, pagination);
@@ -28,19 +28,19 @@ export const KepengurusanService = {
      * @param data Payload data kepengurusan
      */
     async create(data: {
-        cabor_id: number;
-        masa_bakti: string;
+        pemprov?: string;
+        cabor_id?: number;
         nomor_sk: string;
         tanggal_sk: string;
+        tanggal_berakhir?: string;
         ketua_umum: string;
-        ketua_harian?: string;
         sekretaris: string;
         file_path_sk?: string;
         status_kepengurusan?: "Aktif" | "Berakhir";
     }) {
         // Validasi field wajib
-        if (!data.cabor_id || !data.masa_bakti || !data.nomor_sk || !data.tanggal_sk || !data.ketua_umum || !data.sekretaris) {
-            throw new ValidationError("Field cabor_id, masa_bakti, nomor_sk, tanggal_sk, ketua_umum, dan sekretaris wajib diisi.");
+        if (!data.pemprov || !data.nomor_sk || !data.tanggal_sk || !data.tanggal_berakhir || !data.ketua_umum || !data.sekretaris) {
+            throw new ValidationError("Field pemprov, nomor_sk, tanggal_sk, tanggal_berakhir, ketua_umum, dan sekretaris wajib diisi.");
         }
 
         // Validasi status_kepengurusan
@@ -52,22 +52,22 @@ export const KepengurusanService = {
         }
 
         const newKepengurusan = await KepengurusanRepository.create({
+            pemprov: data.pemprov.trim(),
             cabor_id: data.cabor_id,
-            masa_bakti: data.masa_bakti.trim(),
             nomor_sk: data.nomor_sk.trim(),
             tanggal_sk: data.tanggal_sk,
+            tanggal_berakhir: data.tanggal_berakhir,
             ketua_umum: data.ketua_umum.trim(),
-            ketua_harian: data.ketua_harian?.trim(),
             sekretaris: data.sekretaris.trim(),
             file_path_sk: data.file_path_sk?.trim(),
             status_kepengurusan: data.status_kepengurusan || "Aktif"
         });
 
         // Auto-mutasi: jika SK baru berstatus Aktif, matikan SK lama (masih Aktif)
-        // pada cabor yang sama agar hanya SK terbaru yang aktif.
+        // pada pemprov yang sama agar hanya SK terbaru yang aktif.
         if ((data.status_kepengurusan ?? "Aktif") === "Aktif" && newKepengurusan?.id) {
             try {
-                await KepengurusanRepository.deactivateOthers(data.cabor_id, newKepengurusan.id);
+                await KepengurusanRepository.deactivateOthers(data.pemprov.trim(), newKepengurusan.id);
             } catch (err) {
                 // SK utama sudah tersimpan; kegagalan deaktivasi jangan sampai
                 // dianggap gagal total (klien bisa retry dan membuat duplikasi).
@@ -86,12 +86,12 @@ export const KepengurusanService = {
     async update(
         id: string,
         data: Partial<{
+            pemprov: string;
             cabor_id: number;
-            masa_bakti: string;
             nomor_sk: string;
             tanggal_sk: string;
+            tanggal_berakhir: string;
             ketua_umum: string;
-            ketua_harian: string;
             sekretaris: string;
             file_path_sk: string;
             status_kepengurusan: "Aktif" | "Berakhir";
@@ -106,21 +106,24 @@ export const KepengurusanService = {
         }
 
         const payload: any = { ...data };
-        if (data.masa_bakti) payload.masa_bakti = data.masa_bakti.trim();
+        if (data.pemprov) payload.pemprov = data.pemprov.trim();
         if (data.nomor_sk) payload.nomor_sk = data.nomor_sk.trim();
         if (data.ketua_umum) payload.ketua_umum = data.ketua_umum.trim();
-        if (data.ketua_harian) payload.ketua_harian = data.ketua_harian.trim();
         if (data.sekretaris) payload.sekretaris = data.sekretaris.trim();
         if (data.file_path_sk) payload.file_path_sk = data.file_path_sk.trim();
+        if (data.tanggal_berakhir) payload.tanggal_berakhir = data.tanggal_berakhir;
 
         const updated = await KepengurusanRepository.update(id, payload);
 
         // Konsistensi di jalur update: jika SK ini di-set menjadi "Aktif",
-        // matikan SK Aktif lain pada cabor yang sama (kecuali dirinya sendiri)
+        // matikan SK Aktif lain pada pemprov yang sama (kecuali dirinya sendiri)
         // agar tidak ada dua SK aktif sekaligus.
-        if (payload.status_kepengurusan === "Aktif" && updated?.cabor_id != null) {
+        if (payload.status_kepengurusan === "Aktif" && (updated?.pemprov || updated?.cabor_id) != null) {
             try {
-                await KepengurusanRepository.deactivateOthers(updated.cabor_id, Number(id));
+                await KepengurusanRepository.deactivateOthers(
+                    (updated?.pemprov as string) || String(updated?.cabor_id),
+                    Number(id)
+                );
             } catch (err) {
                 console.error("Gagal mematikan SK lain saat update menjadi Aktif:", err);
             }
