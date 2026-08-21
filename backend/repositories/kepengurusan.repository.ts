@@ -13,6 +13,15 @@ export const KepengurusanRepository = {
         filters?: { pemprov?: string; status_kepengurusan?: string; search?: string },
         pagination?: Pagination
     ) {
+        // Auto-mutasi: SK yang tanggal_berakhir-nya sudah lewat otomatis jadi 'Berakhir'
+        // (hilang dari tabel SK aktif, muncul di histori) setiap list diambil.
+        const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD waktu lokal
+        await supabase
+            .from("kepengurusan")
+            .update({ status_kepengurusan: "Berakhir", updated_at: new Date().toISOString() })
+            .eq("status_kepengurusan", "Aktif")
+            .lt("tanggal_berakhir", today);
+
         // cabor(nama_cabor): left join — data lama memakai cabor_id, data baru memakai pemprov.
         const selectStr = "*, cabor(nama_cabor)";
         let query = pagination

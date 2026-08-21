@@ -17,6 +17,15 @@ export const KepengurusanKabupatenRepository = {
         filters?: { kabupaten_kota?: string; status_kepengurusan?: string; search?: string },
         pagination?: Pagination
     ) {
+        // Auto-mutasi: SK yang tanggal_berakhir-nya sudah lewat otomatis jadi 'Berakhir'
+        // (hilang dari tabel SK aktif, muncul di histori) setiap list diambil.
+        const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD waktu lokal
+        await supabase
+            .from("kepengurusan_kabupaten")
+            .update({ status_kepengurusan: "Berakhir", updated_at: new Date().toISOString() })
+            .eq("status_kepengurusan", "Aktif")
+            .lt("tanggal_berakhir", today);
+
         const selectStr = "*";
         let query = pagination
             ? supabase.from("kepengurusan_kabupaten").select(selectStr, { count: "exact" })
