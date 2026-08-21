@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic';
 import { 
   AlertTriangle, 
   ChevronRight,
-  MapPin 
+  MapPin,
+  Medal 
 } from 'lucide-react';
 import { 
   Chart as ChartJS, 
@@ -21,7 +22,6 @@ import {
 import { Line } from 'react-chartjs-2';
 import DashboardStatCard from '@/components/DashboardStatCard';
 import { Card } from '@/components/ui/card';
-import { ExpandableCard } from '@/components/ui/expandable-card';
 import { MOCK_REGIONS, RegionMedal } from '@/data/mockData';
 
 const AcehMap = dynamic(() => import('@/components/AcehMap'), { 
@@ -87,17 +87,24 @@ function RegionList({
             }`}
           >
             <div>
-              <div className="text-[11px] font-extrabold truncate mb-1">{region.kabupaten_kota}</div>
+              <div className={`text-sm font-extrabold truncate mb-1 border px-2 py-1.5 -mx-2.5 -mt-2.5 rounded-t-xl ${isSelected ? 'border-red-300 bg-white' : 'border-gray-200 bg-white'}`}>{region.kabupaten_kota}</div>
             </div>
             <div>
-              <div className="flex items-baseline justify-between mt-1">
-                <span className="text-sm font-black">{region.total_emas}</span>
-                <span className={`text-[9px] uppercase font-bold ${isSelected ? 'text-[#dc2626]' : 'text-gray-400'}`}>Emas</span>
+              <div className="grid grid-cols-3 gap-1 mt-1 text-center">
+                {[
+                  { label: 'Emas', value: region.total_emas, icon: 'text-amber-400' },
+                  { label: 'Perak', value: region.total_perak, icon: 'text-slate-300' },
+                  { label: 'Perunggu', value: region.total_perunggu, icon: 'text-orange-700' },
+                ].map((m) => (
+                  <div key={m.label}>
+                    <div className="text-sm font-black">{m.value}</div>
+                    <div className={`flex items-center justify-center gap-0.5 text-[9px] uppercase font-bold ${isSelected ? 'text-[#dc2626]' : 'text-gray-400'}`}>
+                      <Medal className={`w-3 h-3 ${m.icon}`} />
+                      {m.label}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div
-                className="w-full h-1 rounded-full mt-1.5"
-                style={{ backgroundColor: isSelected ? '#dc2626' : region.color_density_code }}
-              />
             </div>
           </button>
         );
@@ -408,7 +415,7 @@ export default function DashboardPage() {
 
       {/* Admin wilayah: ringkasan wilayah sendiri (tanpa peta) */}
       {isRegionalAdmin ? (
-        <Card className="p-5 animate-slide-in-up">
+        <Card className="p-5 animate-slide-in-up transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.01] shadow-lg">
           <div className="flex items-center gap-3 pb-4 border-b border-gray-100 mb-5">
             <div className="w-10 h-10 rounded-full bg-red-50 border border-red-200 text-[#dc2626] flex items-center justify-center shrink-0">
               <MapPin className="w-5 h-5" />
@@ -420,27 +427,28 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-3 gap-3 sm:gap-4 text-center">
             {[
-              { label: 'Emas', value: myRegion?.total_emas ?? 0, color: 'text-[#dc2626]' },
-              { label: 'Perak', value: myRegion?.total_perak ?? 0, color: 'text-gray-700' },
-              { label: 'Perunggu', value: myRegion?.total_perunggu ?? 0, color: 'text-amber-600' },
+              { label: 'Emas', value: myRegion?.total_emas ?? 0, icon: 'text-amber-400' },
+              { label: 'Perak', value: myRegion?.total_perak ?? 0, icon: 'text-slate-300' },
+              { label: 'Perunggu', value: myRegion?.total_perunggu ?? 0, icon: 'text-orange-700' },
             ].map((m) => (
               <div key={m.label} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <Medal className={`w-5 h-5 mx-auto mb-1 ${m.icon}`} />
                 <div className="text-xs font-bold text-gray-500">{m.label}</div>
-                <div className={`text-2xl sm:text-3xl font-black ${m.color}`}>{m.value}</div>
+                <div className="text-2xl sm:text-3xl font-black text-gray-900">{m.value}</div>
               </div>
             ))}
           </div>
         </Card>
       ) : userRole === null ? (
         /* Peran belum dimuat — skeleton loading agar peta tidak "flash" sesaat untuk admin wilayah */
-        <Card className="relative overflow-hidden h-[520px] sm:h-[620px] lg:h-[720px] animate-slide-in-up">
+<Card className="relative overflow-hidden h-[520px] sm:h-[620px] lg:h-[720px] animate-slide-in-up">
           <div className="w-full h-full bg-gray-100 animate-pulse flex flex-col items-center justify-center gap-2 text-gray-500 font-medium">
             <div className="w-6 h-6 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
             <span>Memuat Dashboard...</span>
           </div>
         </Card>
       ) : (
-      <Card className="relative overflow-hidden h-[520px] sm:h-[620px] lg:h-[720px] animate-slide-in-up">
+      <Card className="relative overflow-hidden h-[700px] sm:h-[800px] lg:h-[720px] animate-slide-in-up transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.01] shadow-lg max-lg:bg-transparent max-lg:shadow-none max-lg:rounded-none">
         {/* Map — hanya desktop; di mobile peta dihilangkan (tidak dimount) */}
         {!isMobile && (
           <div className="absolute inset-0 hidden lg:block">
@@ -454,7 +462,7 @@ export default function DashboardPage() {
 
         {/* Desktop: Floating card — Wilayah Terpilih */}
         {!isMobile && (
-          <Card className={`hidden lg:block absolute left-4 top-20 w-[240px] xl:w-[260px] p-4 bg-white/95 backdrop-blur-sm shadow-md z-20 transition-all duration-300 ease-in-out ${
+          <Card className={`hidden lg:block absolute left-4 top-20 w-[240px] xl:w-[260px] p-4 bg-white shadow-md z-20 transition-all duration-300 ease-in-out ${
             activeRegion
               ? 'opacity-100 translate-x-0 scale-100'
               : 'opacity-0 -translate-x-4 scale-95 pointer-events-none'
@@ -488,15 +496,8 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* Desktop: Floating card — Daftar 23 Wilayah */}
-        {!isMobile && (
-          <ExpandableCard title="Daftar 23 Wilayah">
-            <RegionList regions={mappedRegions} activeRegionId={activeRegion?.id} onSelectRegion={handleSelectRegion} />
-          </ExpandableCard>
-        )}
-
         {/* Mobile: Daftar Wilayah — selalu tampil, tanpa peta */}
-        <div className="lg:hidden absolute inset-3 rounded-2xl bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl overflow-hidden flex flex-col">
+        <div className="lg:hidden absolute inset-0 rounded-none bg-white border border-gray-200 shadow-xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
             <div className="min-w-0">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-900">Daftar Wilayah</h3>
@@ -514,7 +515,7 @@ export default function DashboardPage() {
       )}
 
       {/* Tren Performa Medali Tahunan */}
-      <Card className="p-5">
+<Card className="p-5 transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.01] shadow-lg">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h2 className="text-base font-bold text-gray-900">Tren Performa Medali Tahunan</h2>
           <div className="flex items-center flex-wrap gap-1 bg-gray-100 p-1 rounded-lg">
@@ -535,7 +536,7 @@ export default function DashboardPage() {
       </Card>
 
       {/* EWS — khusus super admin (arsip SK bersifat provinsi) */}
-      {userRole === 'superadmin' && <Card className="p-5">
+      {userRole === 'superadmin' && <Card className="p-5 transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.01] shadow-lg">
         <div className="flex items-center space-x-2 pb-3 mb-3 border-b border-gray-100">
           <AlertTriangle className="w-5 h-5 text-[#dc2626] shrink-0" />
           <div>

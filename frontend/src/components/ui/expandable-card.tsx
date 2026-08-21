@@ -19,7 +19,7 @@ export function ExpandableCard({ title, children }: ExpandableCardProps) {
         className={`relative z-[1] w-full rounded-2xl border p-4 cursor-pointer transition-all duration-[400ms] ${
           isOpen
             ? 'bg-[#dc2626] border-red-700 text-white'
-            : 'bg-white/95 backdrop-blur-sm border-gray-200 text-gray-900 shadow-md'
+            : 'bg-white border-gray-200 text-gray-900 shadow-md'
         }`}
       >
         <div className="flex items-center justify-between">
@@ -41,7 +41,7 @@ export function ExpandableCard({ title, children }: ExpandableCardProps) {
         <div className={`mt-0 sm:-mt-4 overflow-hidden transition-opacity duration-[400ms] ${
           isOpen ? 'opacity-100' : 'opacity-0'
         }`}>
-          <div className="bg-white/95 backdrop-blur-sm border border-b-0 sm:border-t-0 border-gray-200 shadow-md rounded-t-2xl sm:rounded-b-2xl">
+          <div className="bg-white border border-b-0 sm:border-t-0 border-gray-200 shadow-md rounded-t-2xl sm:rounded-b-2xl">
             <div className="scroll-fade-wrapper expanded">
                 <div className="p-4 pt-5 max-h-[40vh] sm:max-h-[520px] overflow-y-auto scrollbar-thin">
                 {children}

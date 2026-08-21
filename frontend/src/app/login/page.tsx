@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Lock, User } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -55,7 +56,7 @@ export default function LoginPage() {
       {/* Overlay to ensure readability */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
 
-      <Card className="relative z-10 w-full max-w-md p-8 bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-white/20">
+      <Card className="relative z-10 w-full max-w-md p-8 bg-white rounded-3xl shadow-2xl border-white/20">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center mb-4 shadow-md overflow-hidden">
             <Image
@@ -87,7 +88,7 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 placeholder="Masukkan username"
                 required
               />
@@ -104,20 +105,20 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 placeholder="Masukkan kata sandi"
                 required
               />
             </div>
           </div>
 
-          <button
+          <Button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] disabled:opacity-70 disabled:hover:scale-100"
+            className="w-full h-12 text-sm hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
           >
             {loading ? 'Memproses...' : 'Masuk ke Sistem'}
-          </button>
+          </Button>
         </form>
 
         <div className="mt-8 text-center text-xs text-gray-400 font-medium">

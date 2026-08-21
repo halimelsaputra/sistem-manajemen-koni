@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, Trophy, Home, LogOut, X, Menu, KeyRound, ShieldCheck, MapPin } from 'lucide-react'
+import { LayoutDashboard, Trophy, Home, LogOut, X, Menu, KeyRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -16,26 +16,8 @@ type MenuItem = {
 
 const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
-  {
-    icon: Trophy,
-    label: 'Direktori Prestasi',
-    href: '/athletes',
-    children: [
-      { label: 'Manajemen Prestasi', href: '/athletes' },
-      { label: 'Manajemen Atlet', href: '/athletes/atlet' },
-      { label: 'Manajemen Cabor', href: '/athletes/cabor' },
-    ],
-  },
-  {
-    icon: Home,
-    label: 'Kepengurusan',
-    href: '/management',
-    children: [
-      { label: 'Kepengurusan Pemprov', href: '/management' },
-      { label: 'Kepengurusan Kabupaten', href: '/management/kabupaten' },
-      { label: 'Histori Kepengurusan KONI', href: '/management/histori' },
-    ],
-  },
+  { icon: Trophy, label: 'Direktori Prestasi', href: '/athletes' },
+  { icon: Home, label: 'Kepengurusan', href: '/management' },
 ]
 
 const generalItems = [
@@ -104,9 +86,6 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
       ? menuItems
       : menuItems.filter((m) => m.href !== '/management')
 
-  const userRoleLabel =
-    user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin_wilayah' ? `Admin · ${user?.region || 'Wilayah'}` : ''
-
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
     setMobileOpen(false);
@@ -121,7 +100,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen w-full app-background">
       {/* Mobile top bar — hamburger + logo (hanya tampil di layar kecil) */}
-      <header className="lg:hidden fixed top-0 inset-x-0 z-40 h-14 bg-white/95 border-b border-gray-200 flex items-center justify-between px-4">
+      <header className="lg:hidden fixed top-0 inset-x-0 z-40 h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
         <button
           onClick={() => setMobileOpen(true)}
           aria-label="Buka menu navigasi"
@@ -157,12 +136,12 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
       <aside
         className={cn(
           "fixed top-0 left-0 h-screen bg-card border-r border-gray-200 z-50 transition-all duration-300 ease-in-out flex flex-col",
-          // Mobile: lebar penuh 208px, masuk/keluar layar
-          "w-52 p-4",
+          // Mobile: lebar penuh 256px, masuk/keluar layar
+          "w-64 p-4",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           // Desktop (lg+): perilaku lama — kolapsibel & selalu terlihat
           "lg:translate-x-0",
-          sidebarOpen ? "lg:w-52 lg:p-4" : "lg:w-[63px] lg:p-3"
+          sidebarOpen ? "lg:w-64 lg:p-4" : "lg:w-[63px] lg:p-3"
         )}
       >
         {/* Logo + Toggle */}
@@ -208,25 +187,6 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        {/* Badge Pengguna — nama + peran/wilayah */}
-        {user && (
-          <div className={cn(
-            "flex items-center gap-2.5 px-3 py-2.5 mb-4 rounded-xl bg-slate-50 border border-gray-100 transition-opacity duration-300",
-            sidebarOpen ? "opacity-100" : "opacity-0"
-          )}>
-            <div className="w-8 h-8 rounded-full bg-[#b91c1c] text-white flex items-center justify-center font-black text-sm shrink-0">
-              {(user.username || 'A').charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-gray-900 truncate">{user.username}</div>
-              <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-500 truncate">
-                {user.role === 'superadmin' ? <ShieldCheck className="w-3 h-3 shrink-0" /> : <MapPin className="w-3 h-3 shrink-0" />}
-                <span className="truncate">{userRoleLabel}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Menu Section */}
         <div className="space-y-4 flex-1">
           <div>
@@ -247,7 +207,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                       href={item.href}
                       onClick={() => setMobileOpen(false)}
                       className={cn(
-                        'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+                        'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:translate-x-1',
                         isActive || isChildActive
                           ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
                           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
@@ -269,7 +229,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                               href={child.href}
                               onClick={() => setMobileOpen(false)}
                               className={cn(
-                                'block px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200',
+                                'block px-2.5 py-1.5 rounded-lg text-sm transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:translate-x-1',
                                 childActive
                                   ? 'font-bold text-[#b91c1c] bg-red-50'
                                   : 'font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900',
@@ -306,7 +266,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                       type="button"
                       onClick={handleLogout}
                       className={cn(
-                        'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 text-left',
+                        'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:translate-x-1 text-left',
                       )}
                     >
                       <item.icon className="w-4 h-4 shrink-0" />
@@ -324,10 +284,10 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
                     className={cn(
-                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-200',
-                      isGeneralActive
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:translate-x-1',
+                        isGeneralActive
+                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
                     )}
                   >
                     <item.icon className="w-4 h-4 shrink-0" />
@@ -349,10 +309,10 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
           "min-h-screen overflow-y-auto transition-all duration-300 ease-in-out flex flex-col",
           // Mobile: tanpa margin kiri + ruang untuk top bar; Desktop: geser sesuai sidebar
           "pt-14 lg:pt-0",
-          sidebarOpen ? "lg:ml-52" : "lg:ml-[63px]"
+          sidebarOpen ? "lg:ml-64" : "lg:ml-[63px]"
         )}
       >
-        <div className="flex-1 p-4 sm:p-6 lg:bg-white/75 lg:p-8">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8">
           {children}
         </div>
       </main>

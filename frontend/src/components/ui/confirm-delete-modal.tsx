@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, X, ArrowRight, Trash2, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ConfirmDeleteModalProps {
   open: boolean;
@@ -77,7 +78,7 @@ export default function ConfirmDeleteModal({
           <button
             onClick={onClose}
             disabled={loading}
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition disabled:opacity-40"
+            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105 disabled:opacity-40"
           >
             <X className="w-5 h-5" />
           </button>
@@ -130,7 +131,7 @@ export default function ConfirmDeleteModal({
                   onKeyDown={handleStep2KeyDown}
                   placeholder={confirmPhrase}
                   disabled={loading}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition disabled:opacity-50"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01] disabled:opacity-50"
                 />
               </div>
             </div>
@@ -139,34 +140,31 @@ export default function ConfirmDeleteModal({
 
         {/* Footer */}
         <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-between items-center shrink-0">
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={step === 1 ? onClose : () => setStep(1)}
             disabled={loading}
-            className="px-7 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-sm rounded-xl transition disabled:opacity-40"
+            className="hover:shadow-lg hover:shadow-black/10 hover:scale-105"
           >
             {step === 1 ? 'Batal' : 'Kembali'}
-          </button>
+          </Button>
 
           {step === 1 ? (
-            <button
+            <Button
               type="button"
               onClick={() => setStep(2)}
-              className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
+              className="hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
             >
               <span>Lanjutkan</span>
               <ArrowRight className="w-4 h-4" />
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
               onClick={onConfirm}
               disabled={!phraseMatch || loading}
-              className={`flex items-center space-x-2 font-bold py-2.5 px-6 rounded-xl transition shadow-md ${
-                phraseMatch && !loading
-                  ? 'bg-[#b91c1c] hover:bg-red-800 text-white'
-                  : 'bg-gray-100 text-gray-300 cursor-not-allowed'
-              }`}
+              className="hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
             >
               {loading ? (
                 <>
@@ -179,7 +177,7 @@ export default function ConfirmDeleteModal({
                   <span>Hapus Permanen</span>
                 </>
               )}
-            </button>
+            </Button>
           )}
         </div>
       </div>

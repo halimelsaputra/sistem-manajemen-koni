@@ -5,18 +5,17 @@ import { createPortal } from 'react-dom';
 import {
   Upload,
   Save,
+  Loader2,
   Search,
   Download,
   CheckCircle2,
   X,
   Plus,
   Trash2,
-  Pencil,
-  Landmark,
-  Building2,
-  History
+  Pencil
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { FormSelect } from '@/components/ui/form-select';
 import Pagination from '@/components/ui/pagination';
 import ConfirmDeleteModal from '@/components/ui/confirm-delete-modal';
@@ -41,6 +40,10 @@ export interface SKRecord {
 type Section = 'pemprov' | 'kabupaten' | 'histori';
 // Jenis kartu CRUD (histori read-only tidak pakai kartu ini)
 type ManageKind = 'pemprov' | 'kabupaten';
+// Filter histori: semua / per jenis
+type HistoriFilter = 'semua' | 'pemprov' | 'kabupaten';
+// Baris histori dengan penanda sumber asal (untuk gabungan "semua")
+type HistoriRow = SKRecord & { srcKind: ManageKind };
 
 const PAGE_SIZE = 20;
 const REGION_OPTIONS = MOCK_REGIONS.map(r => r.kabupaten_kota);
@@ -80,6 +83,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
   const [deleteImpact, setDeleteImpact] = useState<string[]>([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [mounted, setMounted] = useState(false);
 
@@ -148,12 +152,14 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
 
   const handleSaveSK = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return; // cegah double-submit
     const entityField = kind === 'pemprov' ? 'Pemprov' : 'Kabupaten / Kota';
     if (!nomorSk || !ketuaUmum || !sekretaris || !entity) {
       alert(`Mohon lengkapi ${entityField}, Nomor SK, Ketua Umum, dan Sekretaris.`);
       return;
     }
 
+    setSaving(true);
     try {
       // 1) Upload berkas PDF baru jika dipilih (mode edit: opsional)
       let filePath = editingSK?.file_path_sk || '';
@@ -167,11 +173,13 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
         const uploadData = await uploadRes.json();
         if (!uploadRes.ok || !uploadData.data?.path) {
           alert(uploadData.message || 'Gagal mengunggah berkas PDF.');
+          setSaving(false);
           return;
         }
         filePath = uploadData.data.path;
       } else if (!editingSK) {
         alert('Berkas PDF SK wajib diunggah.');
+        setSaving(false);
         return;
       }
 
@@ -223,6 +231,8 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
     } catch (err) {
       console.error(err);
       alert('Terjadi kesalahan koneksi');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -349,23 +359,18 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
         <div className="px-6 py-4 border-b border-gray-100 space-y-3 shrink-0">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center space-x-3">
-              {kind === 'pemprov' ? (
-                <Landmark className="w-5 h-5 text-[#b91c1c]" />
-              ) : (
-                <Building2 className="w-5 h-5 text-[#b91c1c]" />
-              )}
               <h2 className="text-lg font-bold text-gray-900">{cardTitle}</h2>
               <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
                 {total} arsip
               </span>
             </div>
-            <button
+            <Button
               onClick={openAddSKModal}
-              className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
+              className="w-full sm:w-auto hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah SK</span>
-            </button>
+            </Button>
           </div>
 
           <div className="flex flex-wrap items-end gap-2">
@@ -380,7 +385,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                   placeholder={kind === 'pemprov' ? 'Cari arsip...' : 'Cari wilayah atau arsip...'}
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 />
               </div>
             </div>
@@ -398,7 +403,9 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                 <th className="py-3.5 px-6">Tanggal Berakhir</th>
                 <th className="py-3.5 px-6">Ketua Umum</th>
                 <th className="py-3.5 px-6">Sekretaris</th>
-                <th className="py-3.5 px-6 text-center">Aksi</th>
+<th className="py-3.5 px-6 text-center">
+                  <span style={kind === 'kabupaten' ? { transform: 'translateX(9px)' } : undefined} className="inline-block">Aksi</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
@@ -406,17 +413,17 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                 return (
                 <tr key={sk.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-6 font-bold text-gray-900">{entityNameOf(sk)}</td>
-                    <td className="py-3.5 px-6 font-mono text-xs font-semibold text-gray-700">{sk.nomor_sk}</td>
-                    <td className="py-3.5 px-6 font-semibold text-gray-900">{(sk.tanggal_sk || '').slice(0, 10)}</td>
-                    <td className="py-3.5 px-6 font-semibold text-gray-900">{(sk.tanggal_berakhir || '').slice(0, 10)}</td>
-                    <td className="py-3.5 px-6 font-semibold text-gray-900">{sk.ketua_umum}</td>
-                    <td className="py-3.5 px-6 font-semibold text-gray-900">{sk.sekretaris || 'N/A'}</td>
+                    <td className="py-3.5 px-6 font-bold text-gray-700">{sk.nomor_sk}</td>
+                    <td className="py-3.5 px-6 font-bold text-gray-900">{(sk.tanggal_sk || '').slice(0, 10)}</td>
+                    <td className="py-3.5 px-6 font-bold text-gray-900">{(sk.tanggal_berakhir || '').slice(0, 10)}</td>
+                    <td className="py-3.5 px-6 font-bold text-gray-900">{sk.ketua_umum}</td>
+                    <td className="py-3.5 px-6 font-bold text-gray-900">{sk.sekretaris || 'N/A'}</td>
                     <td className="py-3.5 px-6 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => openEditSK(sk)}
                           title="Edit SK"
-                          className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                          className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
@@ -424,7 +431,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                           onClick={() => handleDownloadSignedUrl(sk)}
                           disabled={!sk.file_path_sk}
                           title={sk.file_path_sk ? 'Unduh via Secure Signed URL (5 menit)' : 'SK ini belum memiliki berkas dokumen'}
-                          className={`text-xs font-bold inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition ${
+                          className={`text-xs font-bold inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105 ${
                             sk.file_path_sk
                               ? 'text-gray-700 hover:text-[#b91c1c] hover:bg-red-50 bg-slate-100 border-gray-200'
                               : 'text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed'
@@ -436,7 +443,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                         <button
                           onClick={() => openDeleteModal(sk)}
                           title="Hapus SK (permanen)"
-                          className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                          className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -481,7 +488,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
               </div>
               <button
                 onClick={() => { setShowInputModal(false); setEditingSK(null); }}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -500,7 +507,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                         placeholder="Contoh: Pengprov PSSI Aceh"
                         value={entity}
                         onChange={(e) => setEntity(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                       />
                     </div>
                   ) : (
@@ -525,7 +532,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                     placeholder="Masukkan Nomor Surat Keputusan"
                     value={nomorSk}
                     onChange={(e) => setNomorSk(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
 
@@ -538,7 +545,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                       type="date"
                       value={tanggalSk}
                       onChange={(e) => setTanggalSk(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                     />
                   </div>
                 </div>
@@ -552,7 +559,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                       type="date"
                       value={tanggalBerakhir}
                       onChange={(e) => setTanggalBerakhir(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                     />
                   </div>
                   <p className="text-[11px] text-gray-400 mt-1">Dipakai untuk peringatan kedaluwarsa SK (Early Warning System).</p>
@@ -567,7 +574,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                     placeholder="Nama Lengkap"
                     value={ketuaUmum}
                     onChange={(e) => setKetuaUmum(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
 
@@ -580,7 +587,7 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
                     placeholder="Nama Lengkap"
                     value={sekretaris}
                     onChange={(e) => setSekretaris(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
               </div>
@@ -629,21 +636,23 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
             </form>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex flex-wrap justify-end gap-2 shrink-0">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => { setShowInputModal(false); setEditingSK(null); }}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
+                className="hover:shadow-lg hover:shadow-black/10 hover:scale-105"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 form={`form-sk-${kind}`}
-                className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md"
+                disabled={saving}
+                className="hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
               >
-                <Save className="w-4 h-4" />
-                <span>{editingSK ? 'Simpan Perubahan' : 'Simpan & Otomatisasi Status'}</span>
-              </button>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{saving ? 'Menyimpan...' : editingSK ? 'Simpan Perubahan' : 'Simpan & Otomatisasi Status'}</span>
+              </Button>
             </div>
           </div>
         </div>,
@@ -670,15 +679,16 @@ function SKManagementCard({ kind }: { kind: ManageKind }) {
 // ---------------------------------------------------------------
 // Kartu Histori (read-only) — arsip SK Berakhir, pemprov & kabupaten
 // ---------------------------------------------------------------
-function SKHistoriCard({ kind }: { kind: ManageKind }) {
-  const [skList, setSkList] = useState<SKRecord[]>([]);
+function SKHistoriCard({ filter: initialFilter = 'semua' }: { filter?: HistoriFilter }) {
+  const [skList, setSkList] = useState<HistoriRow[]>([]);
+  const [filter, setFilter] = useState<HistoriFilter>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [pemprovTotal, setPemprovTotal] = useState(0);
+  const [kabupatenTotal, setKabupatenTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const requestSeq = useRef(0);
-
-  const apiBase = API_BY_KIND[kind];
 
   const loadHistori = useCallback(async () => {
     const seq = ++requestSeq.current;
@@ -690,57 +700,70 @@ function SKHistoriCard({ kind }: { kind: ManageKind }) {
 
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}?${params.toString()}`);
-      const data = await res.json();
-      const body = data.data ?? data;
+      const results = await Promise.all(
+        [API_BY_KIND.pemprov, API_BY_KIND.kabupaten].map(base =>
+          fetch(`${base}?${params.toString()}`)
+            .then(r => r.json())
+            .then(d => d.data ?? d)
+            .catch(() => null)
+        )
+      );
       if (seq !== requestSeq.current) return;
 
-      if (Array.isArray(body)) {
-        setSkList(body);
-        setTotal(body.length);
-      } else {
-        const newTotal = body.pagination?.total ?? 0;
-        const totalPages = body.pagination?.totalPages ?? 1;
-        if (newTotal > 0 && page > totalPages) {
-          setPage(totalPages);
-          return;
+      const extract = (body: any): { items: HistoriRow[]; count: number } => {
+        if (!body) return { items: [], count: 0 };
+        if (Array.isArray(body)) {
+          return { items: body.map((sk: SKRecord) => ({ ...sk, srcKind: 'pemprov' as ManageKind })), count: body.length };
         }
-        setSkList(body.items ?? []);
-        setTotal(newTotal);
+        return {
+          items: (body.items ?? []).map((sk: SKRecord) => ({ ...sk, srcKind: 'pemprov' as ManageKind })),
+          count: body.pagination?.total ?? 0,
+        };
+      };
+
+      const pemprov = extract(results[0]);
+      const kabupaten = extract(results[1]);
+
+      setPemprovTotal(pemprov.count);
+      setKabupatenTotal(kabupaten.count);
+
+      const combined: HistoriRow[] = [...pemprov.items, ...kabupaten.items.map(sk => ({ ...sk, srcKind: 'kabupaten' as ManageKind }))];
+      const newTotal = filter === 'semua' ? pemprov.count + kabupaten.count : (filter === 'pemprov' ? pemprov.count : kabupaten.count);
+
+      const totalPages = Math.max(1, Math.ceil(newTotal / PAGE_SIZE));
+      if (newTotal > 0 && page > totalPages) {
+        setPage(totalPages);
+        return;
       }
+      setSkList(filter === 'semua' ? combined : (filter === 'pemprov' ? pemprov.items : kabupaten.items));
+      setTotal(newTotal);
     } catch (err) {
       console.error("Error fetching histori:", err);
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, [page, searchQuery, apiBase]);
+  }, [page, searchQuery, filter]);
 
   useEffect(() => {
     const timer = setTimeout(loadHistori, searchQuery ? 350 : 0);
     return () => clearTimeout(timer);
   }, [loadHistori, searchQuery]);
 
-  const entityNameOf = (sk: SKRecord) => {
-    if (kind === 'kabupaten') return sk.kabupaten_kota || 'N/A';
+  const entityNameOf = (sk: HistoriRow) => {
+    if (sk.srcKind === 'kabupaten') return sk.kabupaten_kota || 'N/A';
     const apiCabor: any = sk.cabor;
     const extracted = apiCabor && typeof apiCabor === 'object' ? apiCabor.nama_cabor : apiCabor;
     return sk.pemprov || extracted || 'N/A';
   };
 
-  const entityLabel = kind === 'pemprov' ? 'Pemprov' : 'Kabupaten / Kota';
-  const cardTitle = kind === 'pemprov' ? 'Histori Kepengurusan Pemprov' : 'Histori Kepengurusan Kabupaten';
+  const entityLabel = filter === 'semua' ? 'Pemprov / Kabupaten' : (filter === 'pemprov' ? 'Pemprov' : 'Kabupaten / Kota');
 
   return (
     <Card className="rounded-2xl overflow-hidden py-0 flex flex-col min-h-[520px]">
       <div className="px-6 py-4 border-b border-gray-100 space-y-3 shrink-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center space-x-3">
-            {kind === 'pemprov' ? (
-              <Landmark className="w-5 h-5 text-[#b91c1c]" />
-            ) : (
-              <Building2 className="w-5 h-5 text-[#b91c1c]" />
-            )}
-            <h2 className="text-lg font-bold text-gray-900">{cardTitle}</h2>
+            <h2 className="text-lg font-bold text-gray-900">Arsip Histori Kepengurusan</h2>
             <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
               {total} arsip
             </span>
@@ -759,10 +782,34 @@ function SKHistoriCard({ kind }: { kind: ManageKind }) {
                 placeholder="Cari arsip histori..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
               />
             </div>
           </div>
+        </div>
+
+        {/* Filter histori: Semua / Pemprov / Kabupaten */}
+        <div className="flex flex-wrap items-center gap-2">
+          {(['semua', 'pemprov', 'kabupaten'] as const).map((f) => (
+            <Button
+              key={f}
+              type="button"
+              size="sm"
+              onClick={() => { setFilter(f); setPage(1); }}
+              variant="outline"
+              className={
+                filter === f
+                  ? 'bg-primary text-white border-primary hover:shadow-lg hover:shadow-primary/30 hover:scale-105'
+                  : 'bg-slate-50 text-gray-600 border-gray-200 hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/30 hover:scale-105'
+              }
+            >
+              {f === 'semua'
+                ? `Semua (${pemprovTotal + kabupatenTotal})`
+                : f === 'pemprov'
+                  ? `Pemprov (${pemprovTotal})`
+                  : `Kabupaten (${kabupatenTotal})`}
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -784,11 +831,11 @@ function SKHistoriCard({ kind }: { kind: ManageKind }) {
             {skList.map((sk) => (
               <tr key={sk.id} className="hover:bg-slate-50/60 transition">
                 <td className="py-3.5 px-6 font-bold text-gray-900">{entityNameOf(sk)}</td>
-                <td className="py-3.5 px-6 font-mono text-xs font-semibold text-gray-700">{sk.nomor_sk}</td>
-                <td className="py-3.5 px-6 font-semibold text-gray-900">{(sk.tanggal_sk || '').slice(0, 10)}</td>
-                <td className="py-3.5 px-6 font-semibold text-gray-900">{(sk.tanggal_berakhir || '').slice(0, 10)}</td>
-                <td className="py-3.5 px-6 font-semibold text-gray-900">{sk.ketua_umum}</td>
-                <td className="py-3.5 px-6 font-semibold text-gray-900">{sk.sekretaris || 'N/A'}</td>
+                <td className="py-3.5 px-6 font-bold text-gray-700">{sk.nomor_sk}</td>
+                <td className="py-3.5 px-6 font-bold text-gray-900">{(sk.tanggal_sk || '').slice(0, 10)}</td>
+                <td className="py-3.5 px-6 font-bold text-gray-900">{(sk.tanggal_berakhir || '').slice(0, 10)}</td>
+                <td className="py-3.5 px-6 font-bold text-gray-900">{sk.ketua_umum}</td>
+                <td className="py-3.5 px-6 font-bold text-gray-900">{sk.sekretaris || 'N/A'}</td>
                 <td className="py-3.5 px-6 text-right">
                   <div className="flex items-center justify-end">
                     <button
@@ -797,11 +844,11 @@ function SKHistoriCard({ kind }: { kind: ManageKind }) {
                           alert('SK ini belum memiliki berkas dokumen.');
                           return;
                         }
-                        window.open(`${apiBase}/${sk.id}/download`, '_blank');
+window.open(`${API_BY_KIND[sk.srcKind]}/${sk.id}/download`, '_blank');
                       }}
                       disabled={!sk.file_path_sk}
                       title={sk.file_path_sk ? 'Unduh via Secure Signed URL (5 menit)' : 'SK ini belum memiliki berkas dokumen'}
-                      className={`text-xs font-bold inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition ${
+                      className={`text-xs font-bold inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105 ${
                         sk.file_path_sk
                           ? 'text-gray-700 hover:text-[#b91c1c] hover:bg-red-50 bg-slate-100 border-gray-200'
                           : 'text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed'
@@ -842,8 +889,9 @@ function SKHistoriCard({ kind }: { kind: ManageKind }) {
 // Halaman utama — memilih kartu berdasarkan section
 // ---------------------------------------------------------------
 export default function ManagementPage({ section = 'pemprov' }: { section?: Section }) {
-  const isHistori = section === 'histori';
-  const manageKind: ManageKind = section === 'kabupaten' ? 'kabupaten' : 'pemprov';
+  const [activeSection, setActiveSection] = useState<Section>(section);
+  const isHistori = activeSection === 'histori';
+  const manageKind: ManageKind = activeSection === 'kabupaten' ? 'kabupaten' : 'pemprov';
 
   return (
     <div className="space-y-8">
@@ -853,17 +901,29 @@ export default function ManagementPage({ section = 'pemprov' }: { section?: Sect
         <p className="text-sm text-gray-500 mt-1">
           Kelola kepengurusan KONI Provinsi (pemprov) dan kabupaten/kota se-Aceh, beserta arsip histori Surat Keputusan secara terpusat.
         </p>
+
+        {/* Tab — ganti card yang ditampilkan */}
+        <div className="flex flex-wrap items-center gap-3 mt-3">
+          {(['pemprov', 'kabupaten', 'histori'] as const).map((t) => (
+            <Button
+              key={t}
+              type="button"
+              onClick={() => setActiveSection(t)}
+              variant="outline"
+              className={
+                activeSection === t
+                  ? 'w-28 bg-primary text-white border-primary hover:shadow-lg hover:shadow-primary/30 hover:scale-105'
+                  : 'w-28 bg-white text-gray-600 border-gray-200 hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/30 hover:scale-105'
+              }
+            >
+              {t === 'pemprov' ? 'Pemprov' : t === 'kabupaten' ? 'Kabupaten' : 'Histori'}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {isHistori ? (
-        <>
-          <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-[#b91c1c]">
-            <History className="w-4 h-4" />
-            <span>Arsip Histori Kepengurusan (status Berakhir)</span>
-          </div>
-          <SKHistoriCard kind="pemprov" />
-          <SKHistoriCard kind="kabupaten" />
-        </>
+        <SKHistoriCard />
       ) : (
         <SKManagementCard kind={manageKind} />
       )}

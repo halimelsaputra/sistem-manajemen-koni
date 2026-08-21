@@ -17,10 +17,12 @@ import {
   Check,
   MapPin,
   Camera,
+  Medal,
   User
 } from 'lucide-react';
 import { MOCK_REGIONS } from '@/data/mockData';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { FormSelect } from '@/components/ui/form-select';
 import Pagination from '@/components/ui/pagination';
 import ConfirmDeleteModal from '@/components/ui/confirm-delete-modal';
@@ -90,6 +92,7 @@ const formatTanggal = (t?: string): string => {
 type AthletesSection = 'prestasi' | 'atlet' | 'cabor';
 
 export default function AthletesPage({ section = 'prestasi' }: { section?: AthletesSection }) {
+  const [activeSection, setActiveSection] = useState<AthletesSection>(section);
   const [prestasiList, setPrestasiList] = useState<Prestasi[]>([]);
   const [atletList, setAtletList] = useState<Atlet[]>([]);
   const [caborList, setCaborList] = useState<Cabor[]>([]);
@@ -211,7 +214,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
   // sehingga pencarian berlaku di seluruh dataset (bukan hanya halaman aktif).
   const loadPrestasi = useCallback(async () => {
     // Halaman Atlet/Cabor tidak menampilkan tabel prestasi → lewati fetch
-    if (section !== 'prestasi') return;
+    if (activeSection !== 'prestasi') return;
     const seq = ++requestSeq.current;
     const params = new URLSearchParams();
     params.set('page', String(page));
@@ -249,7 +252,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, [page, searchQuery, filterCabor, filterDaerah, caborList, section]);
+  }, [page, searchQuery, filterCabor, filterDaerah, caborList, activeSection]);
 
   // Debounce pencarian (350ms) agar tidak refetch per ketukan tombol
   useEffect(() => {
@@ -867,6 +870,25 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
         <p className="text-sm text-gray-500 mt-1">
           Manajemen pencapaian atlet, data atlet, dan cabang olahraga secara terpusat.
         </p>
+
+        {/* Tab — ganti card yang ditampilkan */}
+        <div className="flex flex-wrap items-center gap-3 mt-3">
+          {(['prestasi', 'atlet', 'cabor'] as const).map((t) => (
+            <Button
+              key={t}
+              type="button"
+              onClick={() => setActiveSection(t)}
+              variant="outline"
+              className={
+                activeSection === t
+                  ? 'w-28 bg-primary text-white border-primary hover:shadow-lg hover:shadow-primary/30 hover:scale-105'
+                  : 'w-28 bg-white text-gray-600 border-gray-200 hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/30 hover:scale-105'
+              }
+            >
+              {t === 'prestasi' ? 'Prestasi' : t === 'atlet' ? 'Atlet' : 'Cabor'}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {showSuccessAlert && (
@@ -894,7 +916,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
       )}
 
       {/* Manajemen Prestasi */}
-      {section === 'prestasi' && (
+      {activeSection === 'prestasi' && (
       <Card className="rounded-2xl overflow-hidden py-0 flex flex-col min-h-[780px]">
         <div className="px-6 py-4 border-b border-gray-100 space-y-3 shrink-0">
           <div className="flex flex-col gap-3 items-start sm:flex-row sm:items-center sm:justify-between">
@@ -904,13 +926,13 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                 {total} rekor
               </span>
             </div>
-            <button
+            <Button
               onClick={openAddPrestasiModal}
-              className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
+              className="w-full sm:w-auto hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah Prestasi</span>
-            </button>
+            </Button>
           </div>
 
           <div className="flex flex-wrap items-end gap-2">
@@ -925,7 +947,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                   placeholder="Cari atlet atau event..."
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 />
               </div>
             </div>
@@ -971,7 +993,9 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                 <th className="py-3.5 px-6">Cabang</th>
                 <th className="py-3.5 px-6">Event</th>
                 <th className="py-3.5 px-6">Medali</th>
-                <th className="py-3.5 px-6 text-right">Aksi</th>
+                <th className="py-3.5 px-6 text-right">
+                  <span style={{ transform: 'translateX(-13px)' }} className="inline-block">Aksi</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
@@ -979,38 +1003,43 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                 const details = getAtletDetails(item.atlet_id, item.atlet);
                 let medalBadge = '';
                 if (item.mendali === 'Emas') {
-                  medalBadge = 'bg-amber-100 text-amber-800 border-amber-300';
+                  medalBadge = 'text-amber-400';
                 } else if (item.mendali === 'Perak') {
-                  medalBadge = 'bg-slate-100 text-slate-800 border-slate-300';
+                  medalBadge = 'text-slate-300';
                 } else if (item.mendali === 'Perunggu') {
-                  medalBadge = 'bg-orange-100 text-orange-800 border-orange-300';
+                  medalBadge = 'text-orange-700';
                 } else {
-                  medalBadge = 'bg-gray-100 text-gray-600 border-gray-200';
+                  medalBadge = 'text-gray-400';
                 }
 
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-6 font-bold text-gray-900">{details.nama}</td>
-                    <td className="py-3.5 px-6 text-gray-600 font-medium">{details.daerah}</td>
-                    <td className="py-3.5 px-6 font-semibold text-gray-800">{details.caborName}</td>
-                    <td className="py-3.5 px-6 text-gray-600">
+                    <td className="py-3.5 px-6 text-gray-600 font-bold">{details.daerah}</td>
+                    <td className="py-3.5 px-6 font-bold text-gray-800">{details.caborName}</td>
+                    <td className="py-3.5 px-6 text-gray-600 font-bold">
                       {item.cabang_cabor?.nama_cabang || <span className="text-gray-300">-</span>}
                     </td>
-                    <td className="py-3.5 px-6 text-gray-600">
+                    <td className="py-3.5 px-6 text-gray-600 font-bold">
                       <span>{item.event_kejuaraan}</span>
                       <span className="text-xs text-gray-400 ml-1.5">({formatTanggal(item.tanggal)})</span>
                     </td>
                     <td className="py-3.5 px-6">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold border uppercase tracking-wide ${medalBadge}`}>
-                        {item.mendali}
-                      </span>
+                      {['Emas', 'Perak', 'Perunggu'].includes(item.mendali) ? (
+                        <span className="inline-flex items-center gap-1.5 font-bold text-gray-700">
+                          <Medal className={`w-4 h-4 ${medalBadge}`} />
+                          {item.mendali}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
                     </td>
                     <td className="py-3.5 px-6 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => openEditPrestasi(item)}
                           title="Edit prestasi"
-                          className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                          className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
@@ -1023,7 +1052,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                             description: `Anda akan menghapus prestasi "${item.event_kejuaraan}" milik ${details.nama} (${formatTanggal(item.tanggal)}).`
                           })}
                           title="Hapus prestasi"
-                          className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                          className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1055,7 +1084,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
       )}
 
       {/* Manajemen Data Atlet */}
-      {section === 'atlet' && (
+      {activeSection === 'atlet' && (
       <Card className="rounded-2xl overflow-hidden py-0">
         <div className="px-6 py-4 border-b border-gray-100 space-y-3">
           <div className="flex flex-col gap-3 items-start sm:flex-row sm:items-center sm:justify-between">
@@ -1065,13 +1094,13 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                 {atletList.length} atlet
               </span>
             </div>
-            <button
+            <Button
               onClick={openAddAtletModal}
-              className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
+              className="w-full sm:w-auto hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah Atlet</span>
-            </button>
+            </Button>
           </div>
 
           {/* Filter tabel atlet */}
@@ -1087,7 +1116,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                   placeholder="Cari nama atlet..."
                   value={atletSearch}
                   onChange={(e) => { setAtletSearch(e.target.value); setAtletPage(1); }}
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 />
               </div>
             </div>
@@ -1123,12 +1152,14 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
         <div className="overflow-x-auto">
         <table className="w-full min-w-[600px] text-left border-collapse">
           <thead className="bg-slate-50">
-            <tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
-              <th className="py-2.5 px-6">Nama</th>
-              <th className="py-2.5 px-6">Daerah</th>
-              <th className="py-2.5 px-6">Cabor</th>
-              <th className="py-2.5 px-6 text-right">Aksi</th>
-            </tr>
+<tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
+                <th className="py-2.5 px-6">Nama</th>
+                <th className="py-2.5 px-6">Daerah</th>
+                <th className="py-2.5 px-6">Cabor</th>
+<th className="py-2.5 px-6 text-right">
+                  <span style={{ transform: 'translateX(-30px)' }} className="inline-block">Aksi</span>
+                </th>
+              </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-sm">
             {atletPageItems.map((a) => {
@@ -1157,21 +1188,21 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-6 text-gray-600 font-medium">{a.kabupaten_kota}</td>
-                  <td className="py-3 px-6 font-semibold text-gray-800">{caborName}</td>
+                  <td className="py-3 px-6 text-gray-600 font-bold">{a.kabupaten_kota}</td>
+                  <td className="py-3 px-6 font-bold text-gray-800">{caborName}</td>
                   <td className="py-3 px-6 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => openViewAtlet(a)}
                         title="Lihat biodata & riwayat prestasi"
-                        className="text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition"
+                        className="text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => openEditAtlet(a)}
                         title="Edit atlet"
-                        className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                        className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
@@ -1184,7 +1215,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                           description: `Anda akan menghapus atlet "${a.nama_atlet}" (${a.kabupaten_kota}, ${caborName}) beserta seluruh prestasinya.`
                         })}
                         title="Hapus atlet (cascade ke prestasi)"
-                        className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                        className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1215,7 +1246,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
       )}
 
       {/* Manajemen Data Cabor */}
-      {section === 'cabor' && (
+      {activeSection === 'cabor' && (
       <Card className="rounded-2xl overflow-hidden py-0">
         <div className="px-6 py-4 border-b border-gray-100 space-y-3">
           <div className="flex flex-col gap-3 items-start sm:flex-row sm:items-center sm:justify-between">
@@ -1226,13 +1257,13 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               </span>
             </div>
             {isSuperAdmin && (
-              <button
+              <Button
                 onClick={openAddCaborModal}
-                className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
+                className="w-full sm:w-auto hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
               >
                 <Plus className="w-4 h-4" />
                 <span>Tambah Cabor</span>
-              </button>
+              </Button>
             )}
           </div>
 
@@ -1248,7 +1279,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                 placeholder="Cari nama cabor..."
                 value={caborSearch}
                 onChange={(e) => { setCaborSearch(e.target.value); setCaborPage(1); }}
-                className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
               />
             </div>
           </div>
@@ -1259,7 +1290,9 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
             <thead className="bg-slate-50">
               <tr className="border-b border-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider">
                 <th className="py-2.5 px-6">Nama Cabor</th>
-              <th className="py-2.5 px-6 text-right">Aksi</th>
+              <th className="py-2.5 px-6 text-right">
+                <span style={{ transform: 'translateX(-12px)' }} className="inline-block">Aksi</span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-sm">
@@ -1267,9 +1300,6 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               <tr key={c.id} className="hover:bg-slate-50/60 transition">
                 <td className="py-3 px-6 font-bold text-gray-900">
                   {c.nama_cabor}
-                  <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold bg-red-50 text-[#b91c1c] px-2 py-0.5 rounded-full">
-                    {cabangList.filter(cb => cb.cabor_id === c.id).length} cabang
-                  </span>
                 </td>
                 <td className="py-3 px-6 text-right">
                   {isSuperAdmin ? (
@@ -1277,7 +1307,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                       <button
                         onClick={() => openEditCabor(c)}
                         title="Edit cabor"
-                        className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                        className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
@@ -1290,7 +1320,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                           description: `Anda akan menghapus cabor "${c.nama_cabor}". Seluruh atlet, prestasi, dan SK yang terkait akan ikut terhapus permanen.`
                         })}
                         title="Hapus cabor (cascade ke atlet, prestasi & SK)"
-                        className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition"
+                        className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-2 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1334,7 +1364,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               <button
                 onClick={() => { setShowInputModal(false); setEditingPrestasi(null); }}
                 disabled={prestasiSaving}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition disabled:opacity-40"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105 disabled:opacity-40"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1400,7 +1430,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                     placeholder="Contoh: PON XXI, PORA 2022"
                     value={event}
                     onChange={(e) => setEvent(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
 
@@ -1412,7 +1442,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                     type="date"
                     value={tanggal}
                     onChange={(e) => setTanggal(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
 
@@ -1437,23 +1467,24 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
             </form>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-3 shrink-0">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => { setShowInputModal(false); setEditingPrestasi(null); }}
                 disabled={prestasiSaving}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition disabled:opacity-40"
+                className="hover:shadow-lg hover:shadow-black/10 hover:scale-105"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={handleSavePrestasi}
                 disabled={prestasiSaving}
-                className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
               >
                 {prestasiSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>{prestasiSaving ? 'Menyimpan...' : editingPrestasi ? 'Simpan Perubahan' : 'Simpan Prestasi'}</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>,
@@ -1472,7 +1503,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               <button
                 onClick={() => { setShowCaborModal(false); setEditingCabor(null); }}
                 disabled={caborSaving}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition disabled:opacity-40"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105 disabled:opacity-40"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1488,7 +1519,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                   placeholder="Contoh: Panahan"
                   value={newCaborNama}
                   onChange={(e) => setNewCaborNama(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 />
               </div>
 
@@ -1516,24 +1547,25 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                               }
                             }}
                             autoFocus
-                            className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-900 outline-none focus:border-[#b91c1c] transition"
+                            className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-900 outline-none focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                           />
                           <button
                             type="button"
                             onClick={() => saveEditCabang(cab)}
                             title="Simpan cabang"
-                            className="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg transition"
+                            className="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                           >
                             <Check className="w-4 h-4" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={cancelEditCabang}
-                            title="Batal"
-                            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                          <Button
+                          type="button"
+                          onClick={cancelEditCabang}
+                          variant="ghost"
+                          size="icon-sm"
+                          title="Batal"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                         </div>
                       ) : (
                         <>
@@ -1543,7 +1575,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                               type="button"
                               onClick={() => startEditCabang(cab)}
                               title="Edit nama cabang"
-                              className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition"
+                              className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
@@ -1551,7 +1583,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                               type="button"
                               onClick={() => removeCabang(cab)}
                               title="Hapus cabang"
-                              className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-1.5 rounded-lg transition"
+                              className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-1.5 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -1583,7 +1615,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                       }
                     }}
                     disabled={caborSaving}
-                    className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition disabled:opacity-50"
+                    className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01] disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -1599,23 +1631,24 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
             </form>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-3">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => { setShowCaborModal(false); setEditingCabor(null); }}
                 disabled={caborSaving}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition disabled:opacity-40"
+                className="hover:shadow-lg hover:shadow-black/10 hover:scale-105"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={handleSaveCabor}
                 disabled={caborSaving}
-                className="flex items-center space-x-2 bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
               >
                 {caborSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>{caborSaving ? 'Menyimpan...' : editingCabor ? 'Simpan Perubahan' : 'Simpan Cabor'}</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>,
@@ -1634,7 +1667,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
               <button
                 onClick={() => { setShowAtletModal(false); setEditingAtlet(null); }}
                 disabled={atletSaving}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition disabled:opacity-40"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105 disabled:opacity-40"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1691,7 +1724,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                   placeholder="Masukkan nama atlet"
                   value={newAtletNama}
                   onChange={(e) => setNewAtletNama(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 />
               </div>
 
@@ -1713,7 +1746,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                     placeholder="16 digit NIK"
                     value={newAtletNik}
                     onChange={(e) => setNewAtletNik(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
                 <div>
@@ -1723,7 +1756,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                     placeholder="Contoh: Banda Aceh"
                     value={newAtletTempatLahir}
                     onChange={(e) => setNewAtletTempatLahir(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
                 <div>
@@ -1733,7 +1766,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                     value={newAtletTanggalLahir}
                     max={new Date().toISOString().split('T')[0]}
                     onChange={(e) => setNewAtletTanggalLahir(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
                 <div>
@@ -1743,7 +1776,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                     placeholder="Contoh: 081234567890"
                     value={newAtletNoHp}
                     onChange={(e) => setNewAtletNoHp(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
                 <div>
@@ -1756,7 +1789,7 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                     placeholder="Contoh: 60.5"
                     value={newAtletBeratBadan}
                     onChange={(e) => setNewAtletBeratBadan(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
               </div>
@@ -1796,168 +1829,158 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
                   placeholder="Desa, kecamatan, jalan, dsb."
                   value={newAtletAlamat}
                   onChange={(e) => setNewAtletAlamat(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition resize-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01] resize-none"
                 />
               </div>
             </form>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-3">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => { setShowAtletModal(false); setEditingAtlet(null); }}
                 disabled={atletSaving}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition disabled:opacity-40"
+                className="hover:shadow-lg hover:shadow-black/10 hover:scale-105"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={handleSaveAtlet}
                 disabled={atletSaving}
-                className="flex items-center space-x-2 bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
               >
                 {atletSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>{atletSaving ? 'Menyimpan...' : editingAtlet ? 'Simpan Perubahan' : 'Daftarkan Atlet'}</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>,
         document.body
       )}
 
-      {/* Lihat Detail Atlet Modal — biodata + riwayat prestasi (pop-up) */}
+      {/* Lihat Detail Atlet Modal — biodata + riwayat prestasi (desain kartu profil) */}
       {viewingAtlet && mounted && createPortal(
         <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
-            <div className="bg-white text-gray-900 border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0">
-              <div className="flex items-center space-x-2">
-                <Eye className="w-5 h-5 text-[#b91c1c]" />
-                <h3 className="font-bold text-base">Detail Atlet</h3>
+          <div className="bg-white rounded-[28px] max-w-6xl w-full max-h-[85vh] overflow-y-auto shadow-2xl relative">
+            {/* Tombol tutup — melayang di pojok cover */}
+            <button
+              onClick={() => setViewingAtlet(null)}
+              className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Cover gradasi halus */}
+            <div
+              className="h-32 sm:h-40"
+              style={{
+                background:
+                  'radial-gradient(circle at 78% 25%, rgba(218,224,232,.8), transparent 25%), radial-gradient(circle at 25% 45%, rgba(238,241,244,.95), transparent 35%), linear-gradient(180deg, #f5f6f7 0%, #ffffff 100%)',
+              }}
+            />
+
+            {/* Profil — avatar menimpa cover */}
+            <div className="px-6 sm:px-9 -mt-12 relative">
+              <div className="relative w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gradient-to-br from-gray-800 to-gray-500 flex items-center justify-center text-white text-2xl font-extrabold tracking-tight shrink-0">
+                <span>{(viewingAtlet.nama_atlet.match(/\b\w/g) || []).slice(0, 2).join('').toUpperCase()}</span>
+                {viewingAtlet.foto_url && (
+                  <img
+                    src={`/api/atlet/${viewingAtlet.id}/foto`}
+                    alt={`Foto ${viewingAtlet.nama_atlet}`}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
               </div>
-              <button
-                onClick={() => setViewingAtlet(null)}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              <h3 className="mt-3 text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">{viewingAtlet.nama_atlet}</h3>
+              <p className="text-sm text-gray-500 mt-1">{viewingAtlet.no_hp || '-'}</p>
             </div>
 
-            <div className="overflow-y-auto flex-1 p-6">
-              {/* Biodata */}
-              <div className="flex items-center gap-4 mb-6">
-                <div className="shrink-0 w-16 h-16 rounded-2xl bg-slate-100 border border-gray-200 overflow-hidden flex items-center justify-center">
-                  {viewingAtlet.foto_url ? (
-                    <img
-                      src={`/api/atlet/${viewingAtlet.id}/foto`}
-                      alt={`Foto ${viewingAtlet.nama_atlet}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
+            {/* Bawah modal: informasi (kiri) + history (kanan, selalu terbuka) */}
+            <div className="px-6 sm:px-9 mt-6 pb-8 flex flex-col lg:flex-row gap-5 lg:items-stretch">
+              {/* Kolom kiri — informasi atlet */}
+              <div className="flex-1 min-w-0 w-full">
+                <h4 className="text-sm font-extrabold text-gray-900 uppercase tracking-wider mb-3">Informasi Atlet</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { label: 'Jenis Kelamin', value: viewingAtlet.jenis_kelamin || '-' },
+                    { label: 'Berat Badan', value: viewingAtlet.berat_badan ? `${viewingAtlet.berat_badan} kg` : '-' },
+                    {
+                      label: 'Tempat Tanggal Lahir',
+                      value: [viewingAtlet.tempat_lahir, viewingAtlet.tanggal_lahir ? formatTanggal(viewingAtlet.tanggal_lahir) : null]
+                        .filter(Boolean)
+                        .join(', ') || '-',
+                    },
+                    { label: 'Cabor', value: caborList.find(c => c.id === viewingAtlet.cabor_id)?.nama_cabor || 'Unknown' },
+                    { label: 'Daerah', value: viewingAtlet.kabupaten_kota || '-' },
+                    { label: 'NIK', value: viewingAtlet.nik || '-' },
+                    { label: 'No. HP', value: viewingAtlet.no_hp || '-' },
+                    { label: 'Alamat Lengkap', value: viewingAtlet.alamat_lengkap || '-' },
+                  ].map((f) => (
+                    <div key={f.label} className="bg-slate-50 border border-gray-200 rounded-xl p-4 min-w-0">
+                      <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">{f.label}</div>
+                      <div className="font-extrabold text-gray-900 break-words">{f.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Kolom kanan — history kejuaraan (tanpa container) */}
+              <div className="w-full lg:w-80 shrink-0 min-w-0">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-extrabold text-gray-900 uppercase tracking-wider">History Kejuaraan</h4>
+                  <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold">
+                    {viewingAtletPrestasi.length} Rekor
+                  </span>
+                </div>
+
+                <div className="max-h-[50vh] lg:max-h-[60vh] overflow-y-auto scrollbar-hide pr-0.5">
+                  {viewingAtletLoading ? (
+                    <div className="flex items-center justify-center py-10 text-gray-400 text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Memuat riwayat...
+                    </div>
+                  ) : viewingAtletPrestasi.length === 0 ? (
+                    <div className="text-center py-10 text-gray-400 text-sm bg-slate-50 rounded-xl border border-dashed border-gray-200">
+                      Belum ada prestasi untuk atlet ini.
+                    </div>
                   ) : (
-                    <User className="w-7 h-7 text-gray-300" />
+                    <div className="space-y-3">
+                      {viewingAtletPrestasi.map((p) => {
+                        let medalBadge = 'bg-gray-100 text-gray-600 border-gray-200';
+                        if (p.mendali === 'Emas') {
+                          medalBadge = 'bg-amber-50 text-amber-700 border-amber-300';
+                        } else if (p.mendali === 'Perak') {
+                          medalBadge = 'bg-slate-100 text-slate-700 border-slate-300';
+                        } else if (p.mendali === 'Perunggu') {
+                          medalBadge = 'bg-orange-50 text-orange-800 border-orange-300';
+                        }
+                        return (
+                          <div key={p.id} className="flex items-center justify-between gap-3 bg-slate-50 border border-gray-200 rounded-xl p-4 min-w-0">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-9 h-9 shrink-0 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-amber-700">
+                                <Trophy className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-extrabold text-gray-900 truncate">{p.event_kejuaraan}</p>
+                                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                                  {p.tingkat_lomba} • {formatTanggal(p.tanggal)}
+                                  {p.cabang_cabor?.nama_cabang ? ` • ${p.cabang_cabor.nama_cabang}` : ''}
+                                </p>
+                              </div>
+                            </div>
+                            <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-extrabold border uppercase tracking-wide ${medalBadge}`}>
+                              {p.mendali}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-gray-900 text-lg truncate">{viewingAtlet.nama_atlet}</p>
-                  <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-0.5">
-                    <MapPin className="w-3.5 h-3.5 text-[#b91c1c]" />
-                    {viewingAtlet.kabupaten_kota}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {caborList.find(c => c.id === viewingAtlet.cabor_id)?.nama_cabor || 'Unknown'}
-                  </p>
-                </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Jenis Kelamin</p>
-                  <p className="font-bold text-gray-900">{viewingAtlet.jenis_kelamin || '-'}</p>
-                </div>
-                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">NIK</p>
-                  <p className="font-bold text-gray-900">{viewingAtlet.nik || '-'}</p>
-                </div>
-                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Tempat / Tanggal Lahir</p>
-                  <p className="font-bold text-gray-900">
-                    {[viewingAtlet.tempat_lahir, viewingAtlet.tanggal_lahir ? formatTanggal(viewingAtlet.tanggal_lahir) : null]
-                      .filter(Boolean)
-                      .join(', ') || '-'}
-                  </p>
-                </div>
-                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">No. HP</p>
-                  <p className="font-bold text-gray-900">{viewingAtlet.no_hp || '-'}</p>
-                </div>
-                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Berat Badan</p>
-                  <p className="font-bold text-gray-900">
-                    {viewingAtlet.berat_badan ? `${viewingAtlet.berat_badan} kg` : '-'}
-                  </p>
-                </div>
-                <div className="bg-slate-50 border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Alamat Lengkap</p>
-                  <p className="font-bold text-gray-900">{viewingAtlet.alamat_lengkap || '-'}</p>
-                </div>
-              </div>
-
-              {/* Riwayat prestasi */}
-              <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-[#b91c1c]" />
-                Riwayat Prestasi
-                <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">
-                  {viewingAtletPrestasi.length} rekor
-                </span>
-              </h4>
-
-              {viewingAtletLoading ? (
-                <div className="flex items-center justify-center py-10 text-gray-400 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Memuat riwayat...
-                </div>
-              ) : viewingAtletPrestasi.length === 0 ? (
-                <div className="text-center py-10 text-gray-400 text-sm bg-slate-50 rounded-xl border border-dashed border-gray-200">
-                  Belum ada prestasi untuk atlet ini.
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {viewingAtletPrestasi.map((p) => {
-                    let medalBadge = 'bg-gray-100 text-gray-600 border-gray-200';
-                    if (p.mendali === 'Emas') {
-                      medalBadge = 'bg-amber-100 text-amber-800 border-amber-300';
-                    } else if (p.mendali === 'Perak') {
-                      medalBadge = 'bg-slate-100 text-slate-800 border-slate-300';
-                    } else if (p.mendali === 'Perunggu') {
-                      medalBadge = 'bg-orange-100 text-orange-800 border-orange-300';
-                    }
-                    return (
-                      <div key={p.id} className="flex items-center justify-between gap-3 bg-slate-50 border border-gray-200 rounded-xl px-4 py-3">
-                        <div className="min-w-0">
-                          <p className="font-bold text-gray-900 truncate">{p.event_kejuaraan}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {p.tingkat_lomba} · {formatTanggal(p.tanggal)}
-                            {p.cabang_cabor?.nama_cabang ? ` · ${p.cabang_cabor.nama_cabang}` : ''}
-                          </p>
-                        </div>
-                        <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-extrabold border uppercase tracking-wide ${medalBadge}`}>
-                          {p.mendali}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end shrink-0">
-              <button
-                type="button"
-                onClick={() => setViewingAtlet(null)}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition"
-              >
-                Tutup
-              </button>
             </div>
           </div>
         </div>,

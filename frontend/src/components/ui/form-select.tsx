@@ -51,7 +51,11 @@ export function FormSelect({ label, value, options, onSelect, required = false, 
       {/* Trigger — form input style */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 outline-none focus:bg-white focus:border-[#b91c1c] transition cursor-pointer flex items-center justify-between"
+        className={`w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out cursor-pointer flex items-center justify-between ${
+          isOpen
+            ? 'shadow-lg shadow-black/10 scale-[1.01]'
+            : 'hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01]'
+        }`}
       >
         <span className={value ? "truncate" : "truncate text-gray-400"}>
           {value || placeholder || ''}
@@ -83,7 +87,7 @@ export function FormSelect({ label, value, options, onSelect, required = false, 
                     placeholder="Cari..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-900 placeholder:text-gray-400 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-900 placeholder:text-gray-400 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                   />
                 </div>
               </div>

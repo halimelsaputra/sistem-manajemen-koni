@@ -17,6 +17,7 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { FormSelect } from '@/components/ui/form-select';
 import ConfirmDeleteModal from '@/components/ui/confirm-delete-modal';
 import { REGION_COORDINATES } from '@/data/mapData';
@@ -257,13 +258,13 @@ export default function PengaturanAdminPage() {
                 {admins.length} dari {REGION_OPTIONS.length} wilayah
               </span>
             </div>
-            <button
+            <Button
               onClick={() => openAddModal()}
-              className="flex items-center space-x-1.5 bg-[#b91c1c] hover:bg-red-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition shadow-md"
+              className="w-full sm:w-auto hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah Admin</span>
-            </button>
+            </Button>
           </div>
 
           {/* Search — sisi kiri saja */}
@@ -275,7 +276,7 @@ export default function PengaturanAdminPage() {
                 placeholder="Cari wilayah atau username..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
               />
             </div>
           </div>
@@ -317,14 +318,14 @@ export default function PengaturanAdminPage() {
                           <button
                             onClick={() => openEditModal(admin)}
                             title="Edit admin"
-                            className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition"
+                            className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteTarget(admin)}
                             title="Hapus admin (permanen)"
-                            className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-1.5 rounded-lg transition"
+                            className="text-gray-400 hover:text-[#b91c1c] hover:bg-red-50 p-1.5 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -385,7 +386,7 @@ export default function PengaturanAdminPage() {
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -401,7 +402,7 @@ export default function PengaturanAdminPage() {
                   placeholder="Contoh: admin.banda-aceh"
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 />
               </div>
 
@@ -414,7 +415,7 @@ export default function PengaturanAdminPage() {
                   placeholder="Minimal 6 karakter"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 />
               </div>
 
@@ -436,21 +437,22 @@ export default function PengaturanAdminPage() {
             </form>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end gap-2 shrink-0">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setShowAddModal(false)}
-                className="px-7 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-sm rounded-xl transition"
+                className="hover:shadow-lg hover:shadow-black/10 hover:scale-105"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={savingAdd}
-                className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
               >
                 {savingAdd ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>{savingAdd ? 'Menyimpan...' : 'Simpan Admin'}</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>,
@@ -470,7 +472,7 @@ export default function PengaturanAdminPage() {
               </div>
               <button
                 onClick={() => setEditing(null)}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -496,7 +498,7 @@ export default function PengaturanAdminPage() {
                   placeholder="Contoh: admin.banda-aceh"
                   value={editUsername}
                   onChange={(e) => setEditUsername(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 />
               </div>
 
@@ -509,7 +511,7 @@ export default function PengaturanAdminPage() {
                   placeholder="Minimal 6 karakter"
                   value={editPassword}
                   onChange={(e) => setEditPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#b91c1c] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-[1.01] focus:shadow-lg focus:shadow-black/10 focus:scale-[1.01]"
                 />
               </div>
 
@@ -528,21 +530,22 @@ export default function PengaturanAdminPage() {
             </form>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-gray-100 flex justify-end gap-2 shrink-0">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setEditing(null)}
-                className="px-7 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-sm rounded-xl transition"
+                className="hover:shadow-lg hover:shadow-black/10 hover:scale-105"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={savingEdit}
-                className="flex items-center space-x-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
               >
                 {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>{savingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>,
