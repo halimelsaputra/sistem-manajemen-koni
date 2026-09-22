@@ -710,24 +710,24 @@ function SKHistoriCard({ filter: initialFilter = 'semua' }: { filter?: HistoriFi
       );
       if (seq !== requestSeq.current) return;
 
-      const extract = (body: any): { items: HistoriRow[]; count: number } => {
+      const extract = (body: any, kind: ManageKind): { items: HistoriRow[]; count: number } => {
         if (!body) return { items: [], count: 0 };
         if (Array.isArray(body)) {
-          return { items: body.map((sk: SKRecord) => ({ ...sk, srcKind: 'pemprov' as ManageKind })), count: body.length };
+          return { items: body.map((sk: SKRecord) => ({ ...sk, srcKind: kind })), count: body.length };
         }
         return {
-          items: (body.items ?? []).map((sk: SKRecord) => ({ ...sk, srcKind: 'pemprov' as ManageKind })),
+          items: (body.items ?? []).map((sk: SKRecord) => ({ ...sk, srcKind: kind })),
           count: body.pagination?.total ?? 0,
         };
       };
 
-      const pemprov = extract(results[0]);
-      const kabupaten = extract(results[1]);
+      const pemprov = extract(results[0], 'pemprov');
+      const kabupaten = extract(results[1], 'kabupaten');
 
       setPemprovTotal(pemprov.count);
       setKabupatenTotal(kabupaten.count);
 
-      const combined: HistoriRow[] = [...pemprov.items, ...kabupaten.items.map(sk => ({ ...sk, srcKind: 'kabupaten' as ManageKind }))];
+      const combined: HistoriRow[] = [...pemprov.items, ...kabupaten.items];
       const newTotal = filter === 'semua' ? pemprov.count + kabupaten.count : (filter === 'pemprov' ? pemprov.count : kabupaten.count);
 
       const totalPages = Math.max(1, Math.ceil(newTotal / PAGE_SIZE));

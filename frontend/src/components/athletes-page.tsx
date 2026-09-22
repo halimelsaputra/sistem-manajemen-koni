@@ -1862,23 +1862,22 @@ export default function AthletesPage({ section = 'prestasi' }: { section?: Athle
       {/* Lihat Detail Atlet Modal — biodata + riwayat prestasi (desain kartu profil) */}
       {viewingAtlet && mounted && createPortal(
         <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-[28px] max-w-6xl w-full max-h-[85vh] overflow-y-auto shadow-2xl relative">
-            {/* Tombol tutup — melayang di pojok cover */}
-            <button
-              onClick={() => setViewingAtlet(null)}
-              className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* Cover gradasi halus */}
+          <div className="bg-white rounded-[28px] max-w-6xl w-full max-h-[85vh] overflow-y-auto shadow-2xl">
+            {/* Cover gradasi halus — tombol tutup di dalamnya agar ikut ter-scroll */}
             <div
-              className="h-32 sm:h-40"
+              className="relative h-32 sm:h-40"
               style={{
                 background:
                   'radial-gradient(circle at 78% 25%, rgba(218,224,232,.8), transparent 25%), radial-gradient(circle at 25% 45%, rgba(238,241,244,.95), transparent 35%), linear-gradient(180deg, #f5f6f7 0%, #ffffff 100%)',
               }}
-            />
+            >
+              <button
+                onClick={() => setViewingAtlet(null)}
+                className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all duration-300 ease-out hover:shadow-lg hover:shadow-black/10 hover:scale-105"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             {/* Profil — avatar menimpa cover */}
             <div className="px-6 sm:px-9 -mt-12 relative">

@@ -4,8 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { 
   AlertTriangle, 
-  ChevronRight,
-  MapPin,
+  MapPin, 
   Medal 
 } from 'lucide-react';
 import { 
@@ -569,15 +568,7 @@ export default function DashboardPage() {
           <div className="text-sm text-gray-500 py-4 text-center">Tidak ada SK kepengurusan yang akan kedaluwarsa dalam 3 bulan.</div>
         )}
 
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <a
-            href="/management"
-            className="inline-flex items-center gap-1 text-xs font-bold text-[#dc2626] hover:underline border border-[#dc2626] px-4 py-2 rounded-lg hover:bg-red-50 transition"
-          >
-            Lihat Semua Peringatan
-            <ChevronRight className="w-3.5 h-3.5" />
-          </a>
-        </div>
+
       </Card>}
     </div>
   );

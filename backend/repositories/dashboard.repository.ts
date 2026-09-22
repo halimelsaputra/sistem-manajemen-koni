@@ -60,15 +60,16 @@ export const DashboardRepository = {
      * Mengambil jumlah total data kepengurusan.
      */
     async countKepengurusan() {
-        const { count, error } = await supabase
-            .from("kepengurusan")
-            .select("*", { count: "exact", head: true });
+        const [pemprovRes, kabRes] = await Promise.all([
+            supabase.from("kepengurusan").select("*", { count: "exact", head: true }),
+            supabase.from("kepengurusan_kabupaten").select("*", { count: "exact", head: true })
+        ]);
 
-        if (error) {
-            console.error("Gagal menghitung total kepengurusan:", error.message);
-            throw error;
+        if (pemprovRes.error) {
+            console.error("Gagal menghitung total kepengurusan pemprov:", pemprovRes.error.message);
+            throw pemprovRes.error;
         }
-        return count ?? 0;
+        return (pemprovRes.count ?? 0) + (kabRes.count ?? 0);
     },
 
     /**
@@ -122,15 +123,38 @@ export const DashboardRepository = {
      * Mengambil data kepengurusan aktif beserta nama cabor untuk kalkulasi peringatan SK kedaluwarsa.
      */
     async getActiveKepengurusan() {
-        const { data, error } = await supabase
-            .from("kepengurusan")
-            .select("id, nomor_sk, tanggal_sk, tanggal_berakhir, pemprov, status_kepengurusan, cabor(nama_cabor)")
-            .eq("status_kepengurusan", "Aktif");
+        const [pemprovRes, kabRes] = await Promise.all([
+            supabase
+                .from("kepengurusan")
+                .select("id, nomor_sk, tanggal_sk, tanggal_berakhir, pemprov, status_kepengurusan, cabor(nama_cabor)")
+                .eq("status_kepengurusan", "Aktif"),
+            supabase
+                .from("kepengurusan_kabupaten")
+                .select("id, nomor_sk, tanggal_sk, tanggal_berakhir, kabupaten_kota, status_kepengurusan")
+                .eq("status_kepengurusan", "Aktif")
+        ]);
 
-        if (error) {
-            console.error("Gagal mengambil data kepengurusan aktif:", error.message);
-            throw error;
+        if (pemprovRes.error) {
+            console.error("Gagal mengambil data kepengurusan aktif:", pemprovRes.error.message);
+            throw pemprovRes.error;
         }
-        return data ?? [];
+        if (kabRes.error) {
+            console.error("Gagal mengambil data kepengurusan kab aktif:", kabRes.error.message);
+            throw kabRes.error;
+        }
+
+        const pemprovItems = (pemprovRes.data ?? []).map((p: any) => ({
+            ...p,
+            cabor: p.pemprov || p.cabor?.nama_cabor || "Pengprov",
+            tipe: "Pemprov"
+        }));
+
+        const kabItems = (kabRes.data ?? []).map((k: any) => ({
+            ...k,
+            cabor: `KONI ${k.kabupaten_kota}`,
+            tipe: "Kabupaten"
+        }));
+
+        return [...pemprovItems, ...kabItems];
     }
 };

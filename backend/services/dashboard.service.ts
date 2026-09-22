@@ -70,7 +70,7 @@ function computeSkWarnings(activeKepengurusan: any[]): any[] {
             if (diffDays <= 90) {
                 skWarnings.push({
                     id: kep.id,
-                    cabor: kep.pemprov || kep.cabor?.nama_cabor || "Tidak Diketahui",
+                    cabor: kep.cabor || kep.pemprov || (kep.kabupaten_kota ? `KONI ${kep.kabupaten_kota}` : "Tidak Diketahui"),
                     nomor_sk: kep.nomor_sk,
                     tanggal_sk: kep.tanggal_sk,
                     tanggal_berakhir: kep.tanggal_berakhir,
